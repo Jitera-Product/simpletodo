@@ -2,6 +2,18 @@ class Api::TodosController < Api::BaseController
   before_action :doorkeeper_authorize!
   before_action :set_todo, only: [:destroy, :attach_files, :cancel_deletion]
 
+  def index
+    todos = TodoService::Index.new(params.permit!, current_resource_owner).execute
+
+    render json: todos, status: :ok
+  end
+
+  def trash
+    todos = TodoService::Trash.new(params.permit!, current_resource_owner).execute
+
+    render json: todos, status: :ok
+  end
+
   def create
     validator = TodoService::Validator.new(todo_params)
     unless validator.valid?

@@ -14,16 +14,12 @@ Rails.application.routes.draw do
     put 'users/password_reset/reset', to: 'users#reset_password'
 
     # Todo item routes
-    resources :todos, only: [:create, :destroy] # Combined existing route for creating a todo item with the new destroy action
+    resources :todos, only: [:index :create, :destroy] # Combined existing route for creating a todo item with the new destroy action
+
+    get 'todos/:id/trash', to: 'todos#trash' # New route for completing a to-do item
     post 'todos/:id/cancel_deletion', to: 'todos#cancel_deletion' # New route for canceling the deletion of a to-do item
     post 'todos/:todo_id/attach_files', to: 'todos#attach_files' # Existing route for attaching files to a todo item
     post 'todos/validate', to: 'todos#validate' # Existing route for todo validation
-
-    # User shop update route
-    put 'users/:id/shop', to: 'users#update_shop' # Existing route for updating shop information
-
-    # User profile update route
-    put 'users/:id/profile', to: 'users#update_profile' # New route for updating user profile
 
     # New route for the signin action in UsersController
     post 'users/signin', to: 'users#signin'
