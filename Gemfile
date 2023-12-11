@@ -40,7 +40,7 @@ gem 'turbo-rails'
 # jitera-hook-for-twilio
 gem 'importmap-rails', '~> 1.0'
 # 1.13.0 above is not compatible with M1 Mac Docker environment, need to update docker image later
-gem 'nokogiri', '1.12.5'
+gem 'nokogiri', '1.14.3'
 gem 'secure_headers'
 
 group :production, :staging do
