@@ -5,7 +5,7 @@ ruby '3.0.0'
 
 # Gems for all environments
         gem 'multi_json'
-        gem 'rswag', '~> 2.5.1'
+        gem 'rswag', '~> 2.10.1'
 gem 'active_storage_validations'
 gem 'aws-sdk-s3', require: false
 gem 'bootsnap', '>= 1.4.2', require: false
