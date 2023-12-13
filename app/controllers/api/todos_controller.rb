@@ -1,6 +1,8 @@
 class Api::TodosController < Api::BaseController
   before_action :doorkeeper_authorize!
-  before_action :set_todo, only: [:destroy, :attach_files, :cancel_deletion]
+  before_action :set_todo, only: [:create_comment, :destroy, :attach_files, :cancel_deletion, :comments]
+
+  # ... existing actions ...
 
   def index
     todos = TodoService::Index.new(params.permit!, current_resource_owner).execute
@@ -43,6 +45,18 @@ class Api::TodosController < Api::BaseController
     end
   end
 
+  def create_comment
+    return render json: { error: 'Todo not found.' }, status: :not_found unless @todo
+    return render json: { error: 'You are not authorized to comment on this todo.' }, status: :unauthorized unless @todo.user_id == current_resource_owner.id
+
+    comment = @todo.comments.build(comment_params)
+    if comment.save
+      render 'api/todos/create_comment', status: :created, locals: { comment: comment }
+    else
+      render json: { errors: comment.errors.full_messages }, status: :unprocessable_entity
+    end
+  end
+
   def attach_files
     validate_attachments_params
 
@@ -75,7 +89,6 @@ class Api::TodosController < Api::BaseController
     elsif !validate_cancellation(@todo.id)
       render json: { error: "Cancellation is not valid or the time frame has expired." }, status: :unprocessable_entity
     else
-      # Assuming the Trash model has a method to restore the item
       if Trash.restore(@todo.id)
         render json: { status: 200, message: "To-do item deletion has been successfully canceled." }, status: :ok
       else
@@ -84,12 +97,26 @@ class Api::TodosController < Api::BaseController
     end
   end
 
-  def validate
-    validation_service = TodoValidatorService.new(current_resource_owner, todo_params)
-    if validation_service.valid?
-      render json: { status: 200, message: "The todo item details are valid." }, status: :ok
-    else
-      render json: { errors: validation_service.errors }, status: validation_service.error_status
+  def comments
+    if @todo.nil?
+      render json: { error: "Todo not found." }, status: :not_found
+      return
+    end
+
+    begin
+      comments = @todo.comments.order(created_at: :desc)
+      serialized_comments = comments.map do |comment|
+        {
+          id: comment.id,
+          content: comment.content,
+          created_at: comment.created_at.iso8601,
+          todo_id: comment.todo_id,
+          user_id: comment.user_id
+        }
+      end
+      render json: { status: 200, comments: serialized_comments }, status: :ok
+    rescue => e
+      render json: { error: e.message }, status: :internal_server_error
     end
   end
 
@@ -112,7 +139,6 @@ class Api::TodosController < Api::BaseController
   end
 
   def todo_params
-    # Merging the new and existing todo_params
     params.permit(
       :title,
       :description,
@@ -126,7 +152,15 @@ class Api::TodosController < Api::BaseController
   end
 
   def validate_cancellation(id)
-    # Assuming Trash model has a method to check if cancellation is valid
     Trash.validate_cancellation(id)
+  end
+
+  def comment_params
+    params.require(:comment).permit(:content).tap do |comment_params|
+      if comment_params[:content].length > 500
+        render json: { error: 'Content must be 500 characters or less.' }, status: :unprocessable_entity
+        return
+      end
+    end
   end
 end
