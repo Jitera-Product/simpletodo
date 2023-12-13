@@ -1,6 +1,7 @@
 class Api::CommentsController < Api::BaseController
   before_action :doorkeeper_authorize!
   before_action :authenticate_user!
+  before_action :set_comment, only: [:edit_comment]
   before_action :set_todo, only: [:create]
   before_action :validate_user_and_todo, only: [:create]
 
@@ -21,11 +22,37 @@ class Api::CommentsController < Api::BaseController
     end
   end
 
+  def edit_comment
+    if @comment.user_id != current_resource_owner.id
+      render json: { error: 'User is not authorized to edit this comment.' }, status: :unauthorized
+      return
+    end
+
+    if comment_params[:content].blank? || comment_params[:content].length > 500
+      render json: { error: 'Content cannot be empty and must be less than 500 characters.' }, status: :unprocessable_entity
+      return
+    end
+
+    begin
+      @comment.update!(content: comment_params[:content], updated_at: Time.current)
+      render json: { id: @comment.id, content: @comment.content, updated_at: @comment.updated_at }, status: :ok
+    rescue => e
+      render json: { error: e.message }, status: :internal_server_error
+    end
+  end
+
   private
 
   def authenticate_user!
     # Assuming there's a method to authenticate the user
-    render json: { error: 'User not authenticated' }, status: :unauthorized unless current_user
+    # Use 'current_resource_owner' if defined, otherwise fallback to 'current_user'
+    user = current_resource_owner || current_user
+    render json: { error: 'User not authenticated.' }, status: :unauthorized unless user
+  end
+
+  def set_comment
+    @comment = Comment.find_by(id: params[:id])
+    render json: { error: 'Comment not found.' }, status: :not_found unless @comment
   end
 
   def set_todo
@@ -41,6 +68,8 @@ class Api::CommentsController < Api::BaseController
   end
 
   def comment_params
-    params.permit(:content, :todo_id, :user_id)
+    # Merge the two different comment_params methods
+    # The new code's strong parameters are more restrictive, so we'll use those
+    params.require(:comment).permit(:content).merge(params.permit(:todo_id, :user_id))
   end
 end
