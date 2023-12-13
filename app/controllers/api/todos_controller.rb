@@ -1,6 +1,8 @@
 class Api::TodosController < Api::BaseController
   before_action :doorkeeper_authorize!
   before_action :set_todo, only: [:destroy, :attach_files, :cancel_deletion, :comments]
+  before_action :authenticate_user, only: [:create_comment]
+  before_action :validate_todo_and_user, only: [:create_comment]
   before_action :set_comment, only: [:destroy_comment]
   rescue_from ActiveRecord::RecordNotFound, with: :handle_record_not_found
 
@@ -92,7 +94,6 @@ class Api::TodosController < Api::BaseController
     end
   end
 
-  # New action to handle the retrieval of comments for a specific todo item
   def comments
     if @todo.nil?
       render json: { error: "Todo item not found." }, status: :not_found
@@ -101,14 +102,40 @@ class Api::TodosController < Api::BaseController
 
     comments = @todo.comments.order(created_at: :desc)
     total_comments = comments.count
-
-    # Assuming we have a pagination method available
     comments = paginate(comments)
 
     render json: {
       comments: comments.as_json(only: [:id, :text, :created_at, :user_id]),
       total: total_comments
     }, status: :ok
+  end
+
+  def create_comment
+    text = comment_params[:text]
+    if text.blank? || text.length > 500
+      render json: { error: 'Text parameter is empty or exceeds 500 characters.' }, status: :unprocessable_entity
+      return
+    end
+
+    comment = Comment.new(
+      text: text,
+      todo_id: params[:todo_id],
+      user_id: current_resource_owner.id,
+      created_at: Time.current,
+      updated_at: Time.current
+    )
+
+    if comment.save
+      render json: {
+        id: comment.id,
+        text: comment.text,
+        created_at: comment.created_at,
+        user_id: comment.user_id,
+        todo_id: comment.todo_id
+      }, status: :created
+    else
+      render json: { error: comment.errors.full_messages.join(', ') }, status: :unprocessable_entity
+    end
   end
 
   def destroy_comment
@@ -162,11 +189,26 @@ class Api::TodosController < Api::BaseController
     Trash.validate_cancellation(id)
   end
 
+  def authenticate_user
+    user = User.find_by(id: current_resource_owner.id)
+    render json: { error: 'User not found.' }, status: :not_found unless user
+  end
+
+  def validate_todo_and_user
+    todo = Todo.find_by(id: params[:todo_id])
+    unless todo && todo.user_id == current_resource_owner.id
+      render json: { error: 'Todo not found or user is not authorized.' }, status: :forbidden
+    end
+  end
+
+  def comment_params
+    params.permit(:text, :todo_id)
+  end
+
   def handle_record_not_found
     render json: { error: 'Record not found.' }, status: :not_found
   end
 
-  # New method to handle pagination (assuming we have a common pagination method)
   def paginate(query)
     PaginateService.new(query, params).execute
   end
