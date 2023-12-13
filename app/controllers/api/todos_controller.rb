@@ -1,6 +1,6 @@
 class Api::TodosController < Api::BaseController
   before_action :doorkeeper_authorize!
-  before_action :set_todo, only: [:destroy, :attach_files, :cancel_deletion]
+  before_action :set_todo, only: [:destroy, :attach_files, :cancel_deletion, :comments]
 
   def index
     todos = TodoService::Index.new(params.permit!, current_resource_owner).execute
@@ -75,7 +75,6 @@ class Api::TodosController < Api::BaseController
     elsif !validate_cancellation(@todo.id)
       render json: { error: "Cancellation is not valid or the time frame has expired." }, status: :unprocessable_entity
     else
-      # Assuming the Trash model has a method to restore the item
       if Trash.restore(@todo.id)
         render json: { status: 200, message: "To-do item deletion has been successfully canceled." }, status: :ok
       else
@@ -90,6 +89,24 @@ class Api::TodosController < Api::BaseController
       render json: { status: 200, message: "The todo item details are valid." }, status: :ok
     else
       render json: { errors: validation_service.errors }, status: validation_service.error_status
+    end
+  end
+
+  def comments
+    begin
+      comments = Comment.where(todo_id: @todo.id).order(created_at: :desc)
+      serialized_comments = comments.map do |comment|
+        {
+          id: comment.id,
+          content: comment.content,
+          created_at: comment.created_at,
+          todo_id: comment.todo_id,
+          user_id: comment.user_id
+        }
+      end
+      render json: { comments: serialized_comments, total_count: comments.size }, status: :ok
+    rescue => e
+      render json: { error: e.message }, status: :internal_server_error
     end
   end
 
@@ -112,7 +129,6 @@ class Api::TodosController < Api::BaseController
   end
 
   def todo_params
-    # Merging the new and existing todo_params
     params.permit(
       :title,
       :description,
@@ -126,7 +142,6 @@ class Api::TodosController < Api::BaseController
   end
 
   def validate_cancellation(id)
-    # Assuming Trash model has a method to check if cancellation is valid
     Trash.validate_cancellation(id)
   end
 end
