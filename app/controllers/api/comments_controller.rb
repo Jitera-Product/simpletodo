@@ -1,8 +1,8 @@
 class Api::CommentsController < Api::BaseController
   before_action :doorkeeper_authorize!
   before_action :authenticate_user!
-  before_action :set_comment, only: [:edit_comment, :destroy] # Updated to include :destroy action
-  before_action :set_todo, only: [:create, :destroy] # Updated to include :destroy action
+  before_action :set_comment, only: [:update, :destroy] # Combined actions from new and existing code
+  before_action :set_todo, only: [:create, :update, :destroy] # Combined actions from new and existing code
   before_action :validate_user_and_todo, only: [:create]
 
   def create
@@ -22,20 +22,22 @@ class Api::CommentsController < Api::BaseController
     end
   end
 
-  def edit_comment
-    if @comment.user_id != current_resource_owner.id
-      render json: { error: 'User is not authorized to edit this comment.' }, status: :unauthorized
+  def update
+    if @comment.user_id != current_resource_owner.id || @comment.todo_id != @todo.id
+      render json: { error: 'You are not authorized to edit this comment or comment does not belong to the todo.' }, status: :unauthorized
       return
     end
 
     if comment_params[:content].blank? || comment_params[:content].length > 500
-      render json: { error: 'Content cannot be empty and must be less than 500 characters.' }, status: :unprocessable_entity
+      render json: { error: 'Content must be 500 characters or less.' }, status: :unprocessable_entity
       return
     end
 
     begin
       @comment.update!(content: comment_params[:content], updated_at: Time.current)
-      render json: { id: @comment.id, content: @comment.content, updated_at: @comment.updated_at }, status: :ok
+      render json: { status: 200, comment: @comment.as_json(only: [:id, :content, :updated_at, :todo_id, :user_id]) }, status: :ok
+    rescue ActiveRecord::RecordInvalid => e
+      render json: { error: e.record.errors.full_messages.join(', ') }, status: :unprocessable_entity
     rescue => e
       render json: { error: e.message }, status: :internal_server_error
     end
@@ -58,14 +60,12 @@ class Api::CommentsController < Api::BaseController
   private
 
   def authenticate_user!
-    # Assuming there's a method to authenticate the user
-    # Use 'current_resource_owner' if defined, otherwise fallback to 'current_user'
     user = current_resource_owner || current_user
     render json: { error: 'User not authenticated.' }, status: :unauthorized unless user
   end
 
   def set_comment
-    @comment = Comment.find_by(id: params[:id], todo_id: params[:todo_id]) # Updated to include todo_id check
+    @comment = Comment.find_by(id: params[:id])
     render json: { error: 'Comment not found.' }, status: :not_found unless @comment
   end
 
