@@ -1,16 +1,18 @@
 class Api::TodosController < Api::BaseController
   before_action :doorkeeper_authorize!
-  before_action :set_todo, only: [:destroy, :attach_files, :cancel_deletion]
+  before_action :set_todo, only: [:destroy, :attach_files, :cancel_deletion, :comments]
+  before_action :authenticate_user, only: [:create_comment]
+  before_action :validate_todo_and_user, only: [:create_comment]
+  before_action :set_comment, only: [:destroy_comment]
+  rescue_from ActiveRecord::RecordNotFound, with: :handle_record_not_found
 
   def index
     todos = TodoService::Index.new(params.permit!, current_resource_owner).execute
-
     render json: todos, status: :ok
   end
 
   def trash
     todos = TodoService::Trash.new(params.permit!, current_resource_owner).execute
-
     render json: todos, status: :ok
   end
 
@@ -75,7 +77,6 @@ class Api::TodosController < Api::BaseController
     elsif !validate_cancellation(@todo.id)
       render json: { error: "Cancellation is not valid or the time frame has expired." }, status: :unprocessable_entity
     else
-      # Assuming the Trash model has a method to restore the item
       if Trash.restore(@todo.id)
         render json: { status: 200, message: "To-do item deletion has been successfully canceled." }, status: :ok
       else
@@ -93,11 +94,71 @@ class Api::TodosController < Api::BaseController
     end
   end
 
+  def comments
+    if @todo.nil?
+      render json: { error: "Todo item not found." }, status: :not_found
+      return
+    end
+
+    comments = @todo.comments.order(created_at: :desc)
+    total_comments = comments.count
+    comments = paginate(comments)
+
+    render json: {
+      comments: comments.as_json(only: [:id, :text, :created_at, :user_id]),
+      total: total_comments
+    }, status: :ok
+  end
+
+  def create_comment
+    text = comment_params[:text]
+    if text.blank? || text.length > 500
+      render json: { error: 'Text parameter is empty or exceeds 500 characters.' }, status: :unprocessable_entity
+      return
+    end
+
+    comment = Comment.new(
+      text: text,
+      todo_id: params[:todo_id],
+      user_id: current_resource_owner.id,
+      created_at: Time.current,
+      updated_at: Time.current
+    )
+
+    if comment.save
+      render json: {
+        id: comment.id,
+        text: comment.text,
+        created_at: comment.created_at,
+        user_id: comment.user_id,
+        todo_id: comment.todo_id
+      }, status: :created
+    else
+      render json: { error: comment.errors.full_messages.join(', ') }, status: :unprocessable_entity
+    end
+  end
+
+  def destroy_comment
+    authorize @comment, policy_class: Api::TodosPolicy
+
+    if @comment.user_id != current_resource_owner.id
+      render json: { error: 'You are not authorized to delete this comment.' }, status: :forbidden
+    else
+      @comment.destroy
+      render json: { message: 'Comment was successfully deleted.' }, status: :ok
+    end
+  end
+
   private
 
   def set_todo
     @todo = Todo.find_by(id: params[:todo_id] || params[:id]) || Trash.find_by(id: params[:id])
     render json: { error: 'Todo item not found.' }, status: :not_found unless @todo
+  end
+
+  def set_comment
+    @comment = Comment.find_by(id: params[:id])
+    render json: { error: 'Comment not found.' }, status: :not_found unless @comment
   end
 
   def validate_attachments_params
@@ -112,7 +173,6 @@ class Api::TodosController < Api::BaseController
   end
 
   def todo_params
-    # Merging the new and existing todo_params
     params.permit(
       :title,
       :description,
@@ -126,7 +186,30 @@ class Api::TodosController < Api::BaseController
   end
 
   def validate_cancellation(id)
-    # Assuming Trash model has a method to check if cancellation is valid
     Trash.validate_cancellation(id)
+  end
+
+  def authenticate_user
+    user = User.find_by(id: current_resource_owner.id)
+    render json: { error: 'User not found.' }, status: :not_found unless user
+  end
+
+  def validate_todo_and_user
+    todo = Todo.find_by(id: params[:todo_id])
+    unless todo && todo.user_id == current_resource_owner.id
+      render json: { error: 'Todo not found or user is not authorized.' }, status: :forbidden
+    end
+  end
+
+  def comment_params
+    params.permit(:text, :todo_id)
+  end
+
+  def handle_record_not_found
+    render json: { error: 'Record not found.' }, status: :not_found
+  end
+
+  def paginate(query)
+    PaginateService.new(query, params).execute
   end
 end
