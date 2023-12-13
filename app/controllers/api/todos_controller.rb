@@ -1,6 +1,6 @@
 class Api::TodosController < Api::BaseController
   before_action :doorkeeper_authorize!
-  before_action :set_todo, only: [:destroy, :attach_files, :cancel_deletion]
+  before_action :set_todo, only: [:destroy, :attach_files, :cancel_deletion, :comments]
   before_action :set_comment, only: [:destroy_comment]
   rescue_from ActiveRecord::RecordNotFound, with: :handle_record_not_found
 
@@ -92,6 +92,25 @@ class Api::TodosController < Api::BaseController
     end
   end
 
+  # New action to handle the retrieval of comments for a specific todo item
+  def comments
+    if @todo.nil?
+      render json: { error: "Todo item not found." }, status: :not_found
+      return
+    end
+
+    comments = @todo.comments.order(created_at: :desc)
+    total_comments = comments.count
+
+    # Assuming we have a pagination method available
+    comments = paginate(comments)
+
+    render json: {
+      comments: comments.as_json(only: [:id, :text, :created_at, :user_id]),
+      total: total_comments
+    }, status: :ok
+  end
+
   def destroy_comment
     authorize @comment, policy_class: Api::TodosPolicy
 
@@ -145,5 +164,10 @@ class Api::TodosController < Api::BaseController
 
   def handle_record_not_found
     render json: { error: 'Record not found.' }, status: :not_found
+  end
+
+  # New method to handle pagination (assuming we have a common pagination method)
+  def paginate(query)
+    PaginateService.new(query, params).execute
   end
 end
