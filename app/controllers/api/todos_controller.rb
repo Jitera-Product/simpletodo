@@ -2,6 +2,8 @@ class Api::TodosController < Api::BaseController
   before_action :doorkeeper_authorize!
   before_action :set_todo, only: [:create_comment, :destroy, :attach_files, :cancel_deletion, :comments]
 
+  # ... existing actions ...
+
   def index
     todos = TodoService::Index.new(params.permit!, current_resource_owner).execute
 
@@ -96,18 +98,23 @@ class Api::TodosController < Api::BaseController
   end
 
   def comments
+    if @todo.nil?
+      render json: { error: "Todo not found." }, status: :not_found
+      return
+    end
+
     begin
-      comments = Comment.where(todo_id: @todo.id).order(created_at: :desc)
+      comments = @todo.comments.order(created_at: :desc)
       serialized_comments = comments.map do |comment|
         {
           id: comment.id,
           content: comment.content,
-          created_at: comment.created_at,
+          created_at: comment.created_at.iso8601,
           todo_id: comment.todo_id,
           user_id: comment.user_id
         }
       end
-      render json: { comments: serialized_comments, total_count: comments.size }, status: :ok
+      render json: { status: 200, comments: serialized_comments }, status: :ok
     rescue => e
       render json: { error: e.message }, status: :internal_server_error
     end

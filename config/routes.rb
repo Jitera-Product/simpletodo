@@ -1,4 +1,3 @@
-require 'sidekiq/web'
 
 Rails.application.routes.draw do
   mount Rswag::Ui::Engine => '/api-docs'
@@ -14,7 +13,7 @@ Rails.application.routes.draw do
     put 'users/password_reset/reset', to: 'users#reset_password'
 
     # Todo item routes
-    resources :todos, only: [:index :create, :destroy] # Combined existing route for creating a todo item with the new destroy action
+    resources :todos, only: [:index, :create, :destroy] # Combined existing route for creating a todo item with the new destroy action
 
     get 'todos/:id/trash', to: 'todos#trash' # New route for completing a to-do item
     post 'todos/:id/cancel_deletion', to: 'todos#cancel_deletion' # New route for canceling the deletion of a to-do item
@@ -38,5 +37,8 @@ Rails.application.routes.draw do
 
     # Add the existing route for the confirm_email action in UsersController
     get 'users/confirm_email/:token', to: 'users#confirm_email' # This route was missing in the new code and has been added back
+
+    # Add the new route for retrieving comments for a given todo item
+    get 'todos/:todo_id/comments', to: 'todos#comments_for_todo' # This is the new route as per the guideline
   end
 end
