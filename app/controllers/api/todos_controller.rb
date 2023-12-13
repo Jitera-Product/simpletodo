@@ -1,16 +1,16 @@
 class Api::TodosController < Api::BaseController
   before_action :doorkeeper_authorize!
   before_action :set_todo, only: [:destroy, :attach_files, :cancel_deletion]
+  before_action :set_comment, only: [:destroy_comment]
+  rescue_from ActiveRecord::RecordNotFound, with: :handle_record_not_found
 
   def index
     todos = TodoService::Index.new(params.permit!, current_resource_owner).execute
-
     render json: todos, status: :ok
   end
 
   def trash
     todos = TodoService::Trash.new(params.permit!, current_resource_owner).execute
-
     render json: todos, status: :ok
   end
 
@@ -75,7 +75,6 @@ class Api::TodosController < Api::BaseController
     elsif !validate_cancellation(@todo.id)
       render json: { error: "Cancellation is not valid or the time frame has expired." }, status: :unprocessable_entity
     else
-      # Assuming the Trash model has a method to restore the item
       if Trash.restore(@todo.id)
         render json: { status: 200, message: "To-do item deletion has been successfully canceled." }, status: :ok
       else
@@ -93,11 +92,27 @@ class Api::TodosController < Api::BaseController
     end
   end
 
+  def destroy_comment
+    authorize @comment, policy_class: Api::TodosPolicy
+
+    if @comment.user_id != current_resource_owner.id
+      render json: { error: 'You are not authorized to delete this comment.' }, status: :forbidden
+    else
+      @comment.destroy
+      render json: { message: 'Comment was successfully deleted.' }, status: :ok
+    end
+  end
+
   private
 
   def set_todo
     @todo = Todo.find_by(id: params[:todo_id] || params[:id]) || Trash.find_by(id: params[:id])
     render json: { error: 'Todo item not found.' }, status: :not_found unless @todo
+  end
+
+  def set_comment
+    @comment = Comment.find_by(id: params[:id])
+    render json: { error: 'Comment not found.' }, status: :not_found unless @comment
   end
 
   def validate_attachments_params
@@ -112,7 +127,6 @@ class Api::TodosController < Api::BaseController
   end
 
   def todo_params
-    # Merging the new and existing todo_params
     params.permit(
       :title,
       :description,
@@ -126,7 +140,10 @@ class Api::TodosController < Api::BaseController
   end
 
   def validate_cancellation(id)
-    # Assuming Trash model has a method to check if cancellation is valid
     Trash.validate_cancellation(id)
+  end
+
+  def handle_record_not_found
+    render json: { error: 'Record not found.' }, status: :not_found
   end
 end
