@@ -1,8 +1,8 @@
 class Api::CommentsController < Api::BaseController
   before_action :doorkeeper_authorize!
   before_action :authenticate_user!
-  before_action :set_comment, only: [:edit_comment]
-  before_action :set_todo, only: [:create]
+  before_action :set_comment, only: [:edit_comment, :destroy] # Updated to include :destroy action
+  before_action :set_todo, only: [:create, :destroy] # Updated to include :destroy action
   before_action :validate_user_and_todo, only: [:create]
 
   def create
@@ -41,6 +41,20 @@ class Api::CommentsController < Api::BaseController
     end
   end
 
+  def destroy
+    # Ensure that the current user is the owner of the comment
+    unless @comment.user_id == current_resource_owner.id
+      render json: { error: 'You are not authorized to delete this comment.' }, status: :unauthorized
+      return
+    end
+
+    if @comment.destroy
+      render json: { status: 200, message: 'Comment successfully deleted.' }, status: :ok
+    else
+      render json: { error: 'An unexpected error occurred.' }, status: :internal_server_error
+    end
+  end
+
   private
 
   def authenticate_user!
@@ -51,7 +65,7 @@ class Api::CommentsController < Api::BaseController
   end
 
   def set_comment
-    @comment = Comment.find_by(id: params[:id])
+    @comment = Comment.find_by(id: params[:id], todo_id: params[:todo_id]) # Updated to include todo_id check
     render json: { error: 'Comment not found.' }, status: :not_found unless @comment
   end
 
@@ -68,8 +82,6 @@ class Api::CommentsController < Api::BaseController
   end
 
   def comment_params
-    # Merge the two different comment_params methods
-    # The new code's strong parameters are more restrictive, so we'll use those
     params.require(:comment).permit(:content).merge(params.permit(:todo_id, :user_id))
   end
 end
