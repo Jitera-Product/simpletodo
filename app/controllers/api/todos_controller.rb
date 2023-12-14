@@ -1,5 +1,5 @@
 class Api::TodosController < Api::BaseController
-  before_action :doorkeeper_authorize!, only: %i[create destroy cancel_deletion]
+  before_action :doorkeeper_authorize!, only: %i[create destroy cancel_deletion validate_due_date]
   def create
     @todo = TodoService::Create.new(create_params, current_resource_owner).execute
     if @todo
@@ -23,6 +23,18 @@ class Api::TodosController < Api::BaseController
       render json: { error: result[:error] }, status: :unprocessable_entity
     else
       render json: { status: 200, message: result[:message] }, status: :ok
+    end
+  end
+  def validate_due_date
+    begin
+      due_date = DateTime.parse(params[:due_date])
+      if due_date > DateTime.now
+        render json: { status: 200, message: 'The due date is valid.' }, status: :ok
+      else
+        render json: { error: 'Due date must be in the future.' }, status: :unprocessable_entity
+      end
+    rescue ArgumentError
+      render json: { error: 'Invalid date format.' }, status: :bad_request
     end
   end
   private
