@@ -1,3 +1,4 @@
+# PATH: /config/routes.rb
 require 'sidekiq/web'
 Rails.application.routes.draw do
   mount Rswag::Ui::Engine => '/api-docs'
@@ -19,6 +20,11 @@ Rails.application.routes.draw do
       member do
         post :cancel_deletion
         put :recover
+      end
+      resources :attachments, only: [:create], controller: 'attachments' do
+        collection do
+          post :upload_attachments
+        end
       end
     end
   end

@@ -2,25 +2,35 @@
 class TodoAttachmentsService
   MAX_FILE_SIZE = 10.megabytes # Example constant, replace with actual value from initializer
   ALLOWED_FORMATS = %w[image/jpeg image/png application/pdf].freeze # Example constant, replace with actual value from initializer
-  def process_attachments(todo_id, attachments)
-    attachment_ids = []
+  def upload_and_store_attachments(todo_id, attachments)
+    todo = Todo.find_by(id: todo_id)
+    return { status: 400, error: "Todo not found." } unless todo
+    attachment_results = process_attachments(todo, attachments)
+    if attachment_results[:errors].any?
+      { status: 422, errors: attachment_results[:errors] }
+    else
+      { status: 201, attachments: attachment_results[:attachment_records] }
+    end
+  end
+  private
+  def process_attachments(todo, attachments)
+    attachment_records = []
     errors = []
     attachments.each do |attachment|
       if validate_attachment(attachment)
         file_reference = store_attachment(attachment)
-        attachment_record = create_attachment_record(file_reference, todo_id)
-        attachment_ids << attachment_record.id
+        attachment_record = create_attachment_record(file_reference, todo.id)
+        attachment_records << {
+          id: attachment_record.id,
+          file: attachment_record.file_name,
+          todo_id: attachment_record.todo_id
+        }
       else
-        errors << "Invalid file format or size for #{attachment.original_filename}"
+        errors << "Invalid file format."
       end
     end
-    if errors.any?
-      { success: false, errors: errors }
-    else
-      { success: true, attachment_ids: attachment_ids }
-    end
+    { attachment_records: attachment_records, errors: errors }
   end
-  private
   def validate_attachment(attachment)
     file_size = attachment.size
     file_format = attachment.content_type
