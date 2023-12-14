@@ -1,4 +1,3 @@
-# PATH: /app/services/todo_service/create.rb
 # rubocop:disable Style/ClassAndModuleChildren
 class TodoService::Create
   include ActiveModel::Validations
@@ -19,15 +18,18 @@ class TodoService::Create
     validate_uniqueness_of_title
     run_validations
     create_todo
-    associate_categories
+    associate_with_categories(params[:category_ids], @todo.id) if params[:category_ids].present?
     handle_attachments
     { todo_id: @todo.id }
   end
   private
   def validate_input
-    TodoService::ValidateDetails.new(params).execute
+    # Adjusted to use the new class name for input validation
+    TodoService::ValidateInput.new(params).execute
   end
   def authenticate_user
+    # Combined the authentication logic from the new code with the existing code
+    raise 'User must be authenticated' unless current_user && current_user.id == params[:user_id]
     UserSessionService::Validate.call(user_id: current_user.id)
   end
   def validate_uniqueness_of_title
@@ -53,18 +55,31 @@ class TodoService::Create
     errors.add(:priority, 'is not included in the list') unless ALLOWED_PRIORITIES.include?(params[:priority])
   end
   def create_todo
-    @todo = current_user.todos.new(params.except(:categories, :attachments, :user_id).merge(description: params.fetch(:description, '')))
+    # Merged the create_todo logic to include the description defaulting from the existing code
+    @todo = current_user.todos.new(params.except(:categories, :attachments, :user_id, :category_ids).merge(description: params.fetch(:description, '')))
     raise ActiveRecord::RecordNotSaved.new(@todo) unless @todo.save
   end
-  def associate_categories
-    if params[:category_ids].present?
-      category_ids = params[:category_ids].select { |id| Category.exists?(id) }
-      TodoCategoryAssociator.new(@todo, category_ids).associate!
+  def associate_with_categories(category_ids, todo_id)
+    # Replaced the existing association logic with the new one, as it includes transaction handling
+    associations_created = false
+    ActiveRecord::Base.transaction do
+      category_ids.each do |category_id|
+        category = Category.find_by(id: category_id)
+        raise "Category with id #{category_id} does not exist" unless category
+        TodoCategory.create!(category_id: category_id, todo_id: todo_id)
+      end
+      associations_created = true
     end
+    associations_created
+  rescue ActiveRecord::RecordInvalid => e
+    raise "Failed to create associations: #{e.message}"
   end
   def handle_attachments
+    # Kept the new code's logic for handling attachments as it's more concise and direct
     if params[:attachments].present?
-      TodoAttachmentsService.new(@todo, params[:attachments]).process!
+      params[:attachments].each do |attachment|
+        @todo.attachments.create(file: attachment)
+      end
     end
   end
 end
