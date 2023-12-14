@@ -1,23 +1,37 @@
+# PATH: /app/services/todo_service/validate_details.rb
 # rubocop:disable Style/ClassAndModuleChildren
+require 'date'
 class TodoService::ValidateDetails
   attr_accessor :details
   def initialize(details)
     @details = details
   end
   def execute
-    return send_response('Invalid details') unless title_unique && due_date_valid
-    send_response('Details are valid')
+    uniqueness_result = validate_title_uniqueness(details[:user_id], details[:title])
+    return send_response('Title is already in use', false) unless uniqueness_result[:is_unique]
+    due_date_result = validate_due_date(details[:due_date])
+    return due_date_result unless due_date_result[:is_valid]
+    send_response('Details are valid', true)
   end
   private
-  def title_unique
-    Todo.where(user_id: details[:user_id], title: details[:title]).empty?
+  def validate_title_uniqueness(user_id, title)
+    is_unique = !Todo.exists?(user_id: user_id, title: title)
+    { is_unique: is_unique }
   end
-  def due_date_valid
-    return false unless details[:due_date].future?
-    Todo.where(user_id: details[:user_id]).where('due_date = ?', details[:due_date]).empty?
+  def validate_due_date(due_date)
+    begin
+      parsed_due_date = DateTime.parse(due_date)
+      if parsed_due_date > DateTime.now
+        { is_valid: true }
+      else
+        send_response('Due date must be set in the future', false)
+      end
+    rescue ArgumentError
+      send_response('Invalid due date format', false)
+    end
   end
-  def send_response(message)
-    { message: message }
+  def send_response(message, is_valid)
+    { message: message, is_valid: is_valid }
   end
 end
 # rubocop:enable Style/ClassAndModuleChildren
