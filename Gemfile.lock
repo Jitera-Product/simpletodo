@@ -163,8 +163,8 @@ GEM
       activesupport (>= 5.0.0)
     jmespath (1.6.2)
     json (2.7.1)
-    json-schema (2.8.1)
-      addressable (>= 2.4)
+    json-schema (3.0.0)
+      addressable (>= 2.8)
     kaminari (1.2.2)
       activesupport (>= 4.1.0)
       kaminari-actionview (= 1.2.2)
@@ -219,6 +219,8 @@ GEM
     nio4r (2.7.0)
     nokogiri (1.12.5)
       mini_portile2 (~> 2.6.1)
+      racc (~> 1.4)
+    nokogiri (1.12.5-x86_64-linux)
       racc (~> 1.4)
     orm_adapter (0.5.0)
     parallel (1.23.0)
@@ -319,17 +321,18 @@ GEM
       rspec-mocks (~> 3.10)
       rspec-support (~> 3.10)
     rspec-support (3.12.1)
-    rswag (2.5.1)
-      rswag-api (= 2.5.1)
-      rswag-specs (= 2.5.1)
-      rswag-ui (= 2.5.1)
-    rswag-api (2.5.1)
+    rswag (2.10.1)
+      rswag-api (= 2.10.1)
+      rswag-specs (= 2.10.1)
+      rswag-ui (= 2.10.1)
+    rswag-api (2.10.1)
       railties (>= 3.1, < 7.1)
-    rswag-specs (2.5.1)
+    rswag-specs (2.10.1)
       activesupport (>= 3.1, < 7.1)
-      json-schema (~> 2.2)
+      json-schema (>= 2.2, < 4.0)
       railties (>= 3.1, < 7.1)
-    rswag-ui (2.5.1)
+      rspec-core (>= 2.14)
+    rswag-ui (2.10.1)
       actionpack (>= 3.1, < 7.1)
       railties (>= 3.1, < 7.1)
     rubocop (1.59.0)
@@ -440,6 +443,7 @@ GEM
 
 PLATFORMS
   aarch64-linux
+  x86_64-linux
 
 DEPENDENCIES
   active_storage_validations
@@ -480,7 +484,7 @@ DEPENDENCIES
   redis (= 4.5.1)
   rspec
   rspec-rails (~> 4.0.1)
-  rswag (~> 2.5.1)
+  rswag (~> 2.10.1)
   rubocop
   rubocop-rails
   rubocop-rspec
