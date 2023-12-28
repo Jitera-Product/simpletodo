@@ -1,8 +1,9 @@
 class Api::FoldersController < Api::BaseController
   before_action :authenticate_user!
   before_action :load_user, only: [:create, :check_name_uniqueness]
-  before_action :load_folder, only: [:destroy]
+  before_action :load_folder, only: [:show_todos, :destroy]
   before_action :validate_folder_id_format, only: [:destroy]
+  before_action :authorize_user!, only: [:show_todos]
 
   def create
     folder_params = params.require(:folder).permit(:name, :user_id)
@@ -14,7 +15,7 @@ class Api::FoldersController < Api::BaseController
       else
         folder = @user.folders.build(folder_params)
         folder.save!
-        render json: { status: 201, folder: folder_response(folder) }, status: :created
+        render json: { id: folder.id, name: folder.name, created_at: folder.created_at, updated_at: folder.updated_at }, status: :created
       end
     rescue ActiveRecord::RecordNotFound
       render json: { status: 404, message: "User not found." }, status: :not_found
@@ -25,6 +26,21 @@ class Api::FoldersController < Api::BaseController
     rescue StandardError => e
       render json: { status: 500, message: e.message }, status: :internal_server_error
     end
+  end
+
+  def show_todos
+    # Validate that the id is a number
+    unless params[:id] =~ /^\d+$/
+      render json: { status: 400, message: "Wrong format." }, status: :bad_request
+      return
+    end
+
+    todos = @folder.todos.select(:id, :title, :description, :folder_id, :created_at)
+    render json: { status: 200, todos: todos }, status: :ok
+  rescue ActiveRecord::RecordNotFound
+    render json: { status: 404, message: "Folder not found." }, status: :not_found
+  rescue StandardError => e
+    render json: { status: 500, message: e.message }, status: :internal_server_error
   end
 
   def check_name_uniqueness
@@ -81,9 +97,8 @@ class Api::FoldersController < Api::BaseController
   end
 
   def load_folder
-    @folder = Folder.find(params[:id])
-  rescue ActiveRecord::RecordNotFound
-    render json: { status: 404, message: "Folder not found." }, status: :not_found
+    @folder = Folder.find_by(id: params[:id])
+    render json: { status: 404, message: "Folder not found." }, status: :not_found unless @folder
   end
 
   def folder_exists?(name, user_id)
@@ -96,12 +111,8 @@ class Api::FoldersController < Api::BaseController
     end
   end
 
-  def folder_response(folder)
-    {
-      id: folder.id,
-      name: folder.name,
-      created_at: folder.created_at,
-      user_id: folder.user_id
-    }
+  def authorize_user!
+    # Assuming there's a method to check if @user has access to @folder
+    render json: { status: 403, message: "Forbidden" }, status: :forbidden unless @user.can_access?(@folder)
   end
 end
