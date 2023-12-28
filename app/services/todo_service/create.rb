@@ -1,32 +1,41 @@
 # rubocop:disable Style/ClassAndModuleChildren
 class TodoService::Create
   attr_accessor :params, :todo
-  def initialize(params, _current_user = nil)
+
+  def initialize(params, current_user = nil)
     @params = params
+    @current_user = current_user
   end
+
   def execute
+    authenticate_user
     validate_input
-    check_user_existence
-    check_conflicts
+    check_folder_ownership
     create_todo
   end
+
+  private
+
+  def authenticate_user
+    raise 'User must be logged in to create a todo item.' unless @current_user
+  end
+
   def validate_input
-    TodoService::ValidateInput.new(params).execute
+    raise 'Title cannot be empty.' if params[:title].blank?
   end
-  def check_user_existence
-    TodoService::CheckUserExistence.new(params[:user_id]).execute
+
+  def check_folder_ownership
+    folder = Folder.find_by(id: params[:folder_id])
+    raise 'Folder does not exist or does not belong to the user.' if folder.nil? || folder.user_id != @current_user.id
   end
-  def check_conflicts
-    TodoService::CheckConflicts.new(params).execute
-  end
+
   def create_todo
     @todo = Todo.new(params)
     if @todo.save
-      # Save the attachment file to a secure location and store the file path in the "attachment" field of the todo item.
-      # Send a confirmation message to the user indicating the successful creation of the todo item.
-      return @todo
+      # Additional logic can be added here if needed
+      return @todo.id
     else
-      return false
+      raise 'Failed to create todo item.'
     end
   end
 end
