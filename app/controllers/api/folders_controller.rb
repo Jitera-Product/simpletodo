@@ -1,23 +1,32 @@
 class Api::FoldersController < Api::BaseController
-  before_action :doorkeeper_authorize!, only: [:destroy]
+  before_action :doorkeeper_authorize!, only: [:create]
 
-  # DELETE /api/folders/:id
-  def destroy
-    folder = set_folder
-    if folder
-      FolderService::DeleteTodos.new(folder.id).execute
-      folder.destroy!
-      render json: { message: 'Folder and all associated todos have been successfully deleted.' }, status: :ok
-    else
-      render json: { error: 'Folder not found or not owned by the user.' }, status: :not_found
+  def create
+    folder_name = folder_params[:name]
+    user_id = current_resource_owner.id
+
+    if folder_name.blank? || folder_name.length > 255
+      render json: { error: 'Invalid folder name' }, status: :unprocessable_entity
+      return
     end
-  rescue ActiveRecord::RecordNotDestroyed
-    render json: { error: 'Failed to delete folder.' }, status: :unprocessable_entity
+
+    if Folder.exists?(name: folder_name, user_id: user_id)
+      render json: { error: 'Folder with this name already exists' }, status: :unprocessable_entity
+      return
+    end
+
+    folder = Folder.new(name: folder_name, user_id: user_id)
+
+    if folder.save
+      render json: { folder_id: folder.id }, status: :created
+    else
+      render json: { errors: folder.errors.full_messages }, status: :unprocessable_entity
+    end
   end
 
   private
 
-  def set_folder
-    current_user.folders.find_by(id: params[:id])
+  def folder_params
+    params.require(:folder).permit(:name)
   end
 end
