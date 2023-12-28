@@ -13,17 +13,6 @@ class TodoService::Delete
     delete_todo
   end
 
-  def self.handle_deletion(folder_id)
-    begin
-      folder = Folder.find(folder_id)
-      folder.destroy
-      { status: :success, message: I18n.t('common.200') }
-    rescue => e
-      Rails.logger.error "Deletion failed: #{e.message}"
-      { status: :error, message: I18n.t('common.500') }
-    end
-  end
-
   private
 
   def validate_user
@@ -41,6 +30,29 @@ class TodoService::Delete
       "Todo item with id #{id} has been successfully deleted."
     else
       "Todo item with id #{id} does not exist or does not belong to the user with id #{user_id}."
+    end
+  end
+end
+
+module TodoService
+  class DeleteTodosInFolder
+    def initialize(folder_id)
+      @folder_id = folder_id
+    end
+
+    def call
+      Todo.transaction do
+        todos = Todo.where(folder_id: @folder_id)
+        todos.find_each do |todo|
+          todo.attachments.destroy_all
+          todo.todo_categories.destroy_all
+          todo.todo_tags.destroy_all
+          todo.destroy
+        end
+      end
+      { message: 'All todo items within the folder have been successfully deleted.' }
+    rescue => e
+      raise StandardError, "Failed to delete todo items: #{e.message}"
     end
   end
 end
