@@ -1,5 +1,7 @@
 class Api::TodosController < Api::BaseController
-  before_action :doorkeeper_authorize!, only: %i[create destroy cancel_deletion]
+  before_action :doorkeeper_authorize!, only: %i[create destroy cancel_deletion update]
+  before_action :set_todo, only: %i[update]
+
   def create
     @todo = TodoService::Create.new(create_params, current_resource_owner).execute
     if @todo
@@ -8,6 +10,15 @@ class Api::TodosController < Api::BaseController
       render json: { error: 'Failed to create todo' }, status: :unprocessable_entity
     end
   end
+
+  def update
+    if @todo.update(update_params)
+      render :show, status: :ok
+    else
+      render json: { error: 'Failed to update todo' }, status: :unprocessable_entity
+    end
+  end
+
   def destroy
     @todo = TodoService::ValidateTodo.new(params[:id], current_resource_owner.id).execute
     if @todo
@@ -17,6 +28,7 @@ class Api::TodosController < Api::BaseController
       render json: { error: 'This to-do item is not found' }, status: :unprocessable_entity
     end
   end
+
   def cancel_deletion
     result = TodoService::CancelDeletion.new(params[:id], current_resource_owner.id).execute
     if result[:error]
@@ -25,8 +37,19 @@ class Api::TodosController < Api::BaseController
       render json: { status: 200, message: result[:message] }, status: :ok
     end
   end
+
   private
+
+  def set_todo
+    @todo = TodoService::ValidateTodo.new(params[:id], current_resource_owner.id).execute
+    render json: { error: 'Todo not found' }, status: :not_found unless @todo
+  end
+
   def create_params
     params.require(:todo).permit(:title, :description, :due_date, :category, :priority, :recurring, :attachment)
+  end
+
+  def update_params
+    params.require(:todo).permit(:title, :description, :due_date, :category, :priority, :recurring, :status)
   end
 end
