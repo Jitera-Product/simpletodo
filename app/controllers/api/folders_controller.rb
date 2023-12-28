@@ -1,35 +1,47 @@
-# typed: ignore
-module Api
-  class FoldersController < BaseController
-    before_action :authenticate_user!
-    before_action :set_folder, only: [:deletion_exceptions]
-    before_action :authorize_folder, only: [:deletion_exceptions]
+# FILE PATH: /app/controllers/api/folders_controller.rb
+class Api::FoldersController < Api::BaseController
+  before_action :authenticate_user!
+  include FolderService
 
-    # GET /api/folders/:id/deletion_exceptions
-    def deletion_exceptions
-      # Business logic to check for deletion exceptions
-      if @folder.todos.any? { |todo| todo.deletion_exception? }
-        render json: { status: 500, message: "An error occurred during the deletion process. Please try again later." }, status: :internal_server_error
-      else
-        render json: { status: 200, message: "No exceptions occurred during the deletion process." }, status: :ok
-      end
+  def confirm_deletion
+    folder_id = params[:folder_id]
+    
+    # Validate folder_id is an integer
+    unless folder_id.to_i.to_s == folder_id.to_s
+      render json: { error: "Invalid folder ID format." }, status: :bad_request
+      return
     end
 
-    private
-
-    def set_folder
-      @folder = Folder.find_by(id: params[:id])
-      unless @folder
-        render json: { message: "Folder not found." }, status: :not_found
-      end
+    begin
+      folder = Folder.find(folder_id)
+    rescue ActiveRecord::RecordNotFound
+      render json: { error: "Folder not found." }, status: :not_found
+      return
     end
 
-    def authorize_folder
-      authorize @folder, :deletion_exceptions?
-    end
+    confirm_existence_and_content(folder_id)
+    policy = ApplicationPolicy.new(current_user, folder)
 
-    def folder_params
-      params.permit(:id)
+    if policy.user_can_delete_folders?(current_user.id)
+      render json: {
+        status: 200,
+        message: "Are you sure you want to delete this folder and all its contents?",
+        folder: {
+          id: folder.id,
+          name: folder.name,
+          created_at: folder.created_at
+        }
+      }, status: :ok
+    else
+      render json: { error: "Forbidden" }, status: :forbidden
     end
+  rescue FolderService::FolderEmptyError => e
+    render json: { error: e.message }, status: :bad_request
+  end
+
+  private
+
+  def authenticate_user!
+    # Method to check if user is authenticated
   end
 end
