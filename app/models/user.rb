@@ -16,6 +16,11 @@ class User < ApplicationRecord
 
   class << self
     # custom methods
+
+    # Checks if a folder name is unique for a given user_id
+    def unique_folder_name?(folder_name, user_id)
+      !Folder.exists?(name: folder_name, user_id: user_id)
+    end
   end
 
   # custom instance methods
