@@ -21,13 +21,41 @@ class Api::TodosController < Api::BaseController
   end
 
   def update
-    if @todo.update(update_params)
-      render :show, status: :ok
+    if @todo.nil?
+      render json: { error: 'Todo not found' }, status: :not_found
+      return
+    end
+
+    unless params[:id].to_s.match?(/\A\d+\z/)
+      render json: { error: 'Wrong format.' }, status: :bad_request
+      return
+    end
+
+    title = params[:todo][:title]
+    description = params[:todo][:description]
+
+    if title.blank?
+      render json: { error: 'The title is required.' }, status: :unprocessable_entity
+      return
+    elsif title.length > 200
+      render json: { error: 'You cannot input more than 200 characters.' }, status: :unprocessable_entity
+      return
+    end
+
+    if description.length > 1000
+      render json: { error: 'You cannot input more than 1000 characters.' }, status: :unprocessable_entity
+      return
+    end
+
+    if @todo.update(title: title, description: description)
+      render json: { status: 200, todo: @todo.as_json(only: %i[id title description folder_id updated_at]) }, status: :ok
     else
       render json: { error: 'Failed to update todo' }, status: :unprocessable_entity
     end
   rescue ActiveRecord::RecordNotFound
     render json: { error: 'Todo not found' }, status: :not_found
+  rescue StandardError => e
+    render json: { error: e.message }, status: :internal_server_error
   end
 
   def destroy
@@ -67,6 +95,6 @@ class Api::TodosController < Api::BaseController
   end
 
   def update_params
-    params.require(:todo).permit(:title, :description, :status)
+    params.require(:todo).permit(:title, :description)
   end
 end
