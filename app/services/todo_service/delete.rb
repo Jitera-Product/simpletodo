@@ -1,22 +1,39 @@
 # rubocop:disable Style/ClassAndModuleChildren
 class TodoService::Delete
   attr_accessor :id, :user_id
+
   def initialize(id, user_id)
     @id = id
     @user_id = user_id
   end
+
   def execute
     validate_user
     validate_todo
     delete_todo
   end
+
+  def self.handle_deletion(folder_id)
+    begin
+      folder = Folder.find(folder_id)
+      folder.destroy
+      { status: :success, message: I18n.t('common.200') }
+    rescue => e
+      Rails.logger.error "Deletion failed: #{e.message}"
+      { status: :error, message: I18n.t('common.500') }
+    end
+  end
+
   private
+
   def validate_user
     UserService::ValidateUser.new(user_id).execute
   end
+
   def validate_todo
     TodoService::ValidateTodo.new(id, user_id).execute
   end
+
   def delete_todo
     todo = Todo.find_by(id: id, user_id: user_id)
     if todo
