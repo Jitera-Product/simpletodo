@@ -1,5 +1,5 @@
 class Api::FoldersController < Api::BaseController
-  before_action :doorkeeper_authorize!, only: [:create, :index]
+  before_action :doorkeeper_authorize!, only: [:create, :create_custom]
 
   def create
     folder_name = folder_params[:name]
@@ -24,17 +24,29 @@ class Api::FoldersController < Api::BaseController
     end
   end
 
-  def index
-    user_id = current_resource_owner.id # Changed from params[:user_id] to current_resource_owner.id
+  # POST /api/folders
+  def create_custom
+    user_id = folder_params[:user_id]
+    folder_name = folder_params[:name]
 
-    folders = Folder.where(user_id: user_id).select(:id, :name, :created_at, :user_id)
+    return render json: { error: 'The folder name is required.' }, status: :bad_request if folder_name.blank?
+    return render json: { error: 'The folder name cannot exceed 100 characters.' }, status: :bad_request if folder_name.length > 100
+    return render json: { error: 'User not found.' }, status: :bad_request unless User.exists?(user_id)
 
-    render json: { status: 200, folders: folders }, status: :ok
+    folder = Folder.new(name: folder_name, user_id: user_id)
+
+    if folder.save
+      render json: { status: 201, folder: folder.as_json(only: [:id, :name, :created_at, :user_id]) }, status: :created
+    else
+      render json: { errors: folder.errors.full_messages }, status: :unprocessable_entity
+    end
+  rescue StandardError => e
+    render json: { error: 'An unexpected error occurred on the server.' }, status: :internal_server_error
   end
 
   private
 
   def folder_params
-    params.require(:folder).permit(:name)
+    params.require(:folder).permit(:name, :user_id)
   end
 end
