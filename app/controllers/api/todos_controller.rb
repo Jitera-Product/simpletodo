@@ -1,6 +1,7 @@
 class Api::TodosController < Api::BaseController
-  before_action :doorkeeper_authorize!, only: %i[create destroy cancel_deletion update]
-  before_action :set_todo, only: %i[update]
+  before_action :doorkeeper_authorize!, only: %i[create destroy cancel_deletion]
+  before_action :authenticate_user!, only: [:destroy]
+  before_action :set_todo, only: [:destroy]
 
   def create
     @todo = TodoService::Create.new(create_params, current_resource_owner).execute
@@ -11,22 +12,17 @@ class Api::TodosController < Api::BaseController
     end
   end
 
-  def update
-    if @todo.update(update_params)
-      render :show, status: :ok
-    else
-      render json: { error: 'Failed to update todo' }, status: :unprocessable_entity
-    end
-  end
-
   def destroy
-    @todo = TodoService::ValidateTodo.new(params[:id], current_resource_owner.id).execute
     if @todo
-      message = TodoService::Delete.new(params[:id], current_resource_owner.id).execute
+      message = TodoService::Delete.new(@todo.id, current_resource_owner.id).execute
       render json: { status: 200, message: message }, status: :ok
     else
-      render json: { error: 'This to-do item is not found' }, status: :unprocessable_entity
+      render json: { error: 'This to-do item is not found' }, status: :not_found
     end
+  rescue UserSessionService::NotAuthorizedError
+    render json: { error: 'Not authorized to perform this action' }, status: :forbidden
+  rescue => e
+    render json: { error: 'Internal server error' }, status: :internal_server_error
   end
 
   def cancel_deletion
@@ -40,16 +36,15 @@ class Api::TodosController < Api::BaseController
 
   private
 
+  def authenticate_user!
+    UserSessionService::Validate.new(request.headers).execute!
+  end
+
   def set_todo
-    @todo = TodoService::ValidateTodo.new(params[:id], current_resource_owner.id).execute
-    render json: { error: 'Todo not found' }, status: :not_found unless @todo
+    @todo = Todo.find_by(id: params[:id], user_id: current_resource_owner.id)
   end
 
   def create_params
     params.require(:todo).permit(:title, :description, :due_date, :category, :priority, :recurring, :attachment)
-  end
-
-  def update_params
-    params.require(:todo).permit(:title, :description, :due_date, :category, :priority, :recurring, :status)
   end
 end
