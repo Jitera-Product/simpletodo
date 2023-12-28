@@ -1,6 +1,6 @@
 class Api::FoldersController < Api::BaseController
   before_action :authenticate_user!
-  before_action :load_user, only: [:create]
+  before_action :load_user, only: [:create, :check_name_uniqueness]
   before_action :load_folder, only: [:destroy]
   before_action :validate_folder_id_format, only: [:destroy]
 
@@ -24,6 +24,27 @@ class Api::FoldersController < Api::BaseController
       render json: { status: 422, message: e.record.errors.full_messages }, status: :unprocessable_entity
     rescue StandardError => e
       render json: { status: 500, message: e.message }, status: :internal_server_error
+    end
+  end
+
+  def check_name_uniqueness
+    name = params[:name]
+    user_id = params[:user_id]
+
+    if name.blank?
+      render json: { status: 400, message: "The folder name is required." }, status: :bad_request
+      return
+    end
+
+    unless User.exists?(user_id)
+      render json: { status: 404, message: "User not found." }, status: :not_found
+      return
+    end
+
+    if folder_exists?(name, user_id)
+      render json: { status: 200, is_unique: false, message: "Folder name already exists. Please choose a different name." }, status: :ok
+    else
+      render json: { status: 200, is_unique: true }, status: :ok
     end
   end
 
@@ -54,7 +75,7 @@ class Api::FoldersController < Api::BaseController
   end
 
   def load_user
-    @user = User.find(params[:folder][:user_id])
+    @user = User.find(params[:folder][:user_id] || params[:user_id])
   rescue ActiveRecord::RecordNotFound
     render json: { status: 404, message: "User not found." }, status: :not_found
   end
