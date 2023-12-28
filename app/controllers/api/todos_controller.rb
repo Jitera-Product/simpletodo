@@ -1,6 +1,7 @@
 class Api::TodosController < Api::BaseController
-  before_action :doorkeeper_authorize!, only: %i[create destroy cancel_deletion index]
-  
+  before_action :doorkeeper_authorize!, only: %i[create destroy cancel_deletion index update]
+  before_action :set_todo, only: %i[update destroy]
+
   def index
     if folder_exists?(params[:folder_id])
       todos = Todo.where(folder_id: params[:folder_id])
@@ -19,8 +20,17 @@ class Api::TodosController < Api::BaseController
     end
   end
 
+  def update
+    if @todo.update(update_params)
+      render :show, status: :ok
+    else
+      render json: { error: 'Failed to update todo' }, status: :unprocessable_entity
+    end
+  rescue ActiveRecord::RecordNotFound
+    render json: { error: 'Todo not found' }, status: :not_found
+  end
+
   def destroy
-    @todo = TodoService::ValidateTodo.new(params[:id], current_resource_owner.id).execute
     if @todo
       begin
         message = TodoService::Delete.new(params[:id], current_resource_owner.id).execute
@@ -44,11 +54,19 @@ class Api::TodosController < Api::BaseController
 
   private
 
+  def set_todo
+    @todo = TodoService::ValidateTodo.new(params[:id], current_resource_owner.id).execute
+  end
+
   def folder_exists?(folder_id)
     Folder.exists?(folder_id)
   end
 
   def create_params
     params.require(:todo).permit(:title, :description, :due_date, :category, :priority, :recurring, :attachment)
+  end
+
+  def update_params
+    params.require(:todo).permit(:title, :description, :status)
   end
 end
