@@ -1,5 +1,5 @@
 class Api::FoldersController < Api::BaseController
-  before_action :doorkeeper_authorize!, only: [:create, :destroy] # Updated to include :destroy action
+  before_action :doorkeeper_authorize!, only: [:create, :index]
 
   def create
     folder_name = folder_params[:name]
@@ -24,29 +24,12 @@ class Api::FoldersController < Api::BaseController
     end
   end
 
-  def destroy
-    folder_id = params[:id]
-    user_id = current_resource_owner.id
+  def index
+    user_id = current_resource_owner.id # Changed from params[:user_id] to current_resource_owner.id
 
-    begin
-      # Ensure the ID is an integer
-      Integer(folder_id)
-    rescue ArgumentError
-      render json: { error: 'Invalid ID format.' }, status: :bad_request
-      return
-    end
+    folders = Folder.where(user_id: user_id).select(:id, :name, :created_at, :user_id)
 
-    folder = Folder.find_by(id: folder_id, user_id: user_id)
-    if folder.nil?
-      render json: { error: 'Folder not found.' }, status: :not_found
-      return
-    end
-
-    if folder.destroy
-      render json: { status: 200, message: 'Folder and its todo items successfully deleted.' }, status: :ok
-    else
-      render json: { error: folder.errors.full_messages }, status: :internal_server_error
-    end
+    render json: { status: 200, folders: folders }, status: :ok
   end
 
   private

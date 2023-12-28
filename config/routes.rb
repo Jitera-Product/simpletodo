@@ -1,9 +1,11 @@
 require 'sidekiq/web'
+
 Rails.application.routes.draw do
   mount Rswag::Ui::Engine => '/api-docs'
   mount Rswag::Api::Engine => '/api-docs'
   get '/health' => 'pages#health_check'
   get 'api-docs/v1/swagger.yaml' => 'swagger#yaml'
+
   namespace :api do
     resources :users, only: [] do
       collection do
@@ -15,11 +17,15 @@ Rails.application.routes.draw do
         put :reset_password
       end
     end
+
     resources :todos, only: [:create, :destroy] do
       member do
         post :cancel_deletion
         put :recover
       end
     end
+
+    # Added new route for FoldersController#index as per requirement
+    get '/folders', to: 'folders#index', as: :user_folders
   end
 end
