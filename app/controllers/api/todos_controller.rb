@@ -92,8 +92,11 @@ class Api::TodosController < Api::BaseController
   private
 
   def set_todo
-    @todo = current_resource_owner.todos.find_by(id: params[:id])
-    render json: { error: 'Todo not found' }, status: :not_found if @todo.nil?
+    @todo = TodoService::ValidateTodo.new(params[:id], current_resource_owner.id).execute
+  rescue ActiveRecord::RecordNotFound
+    @todo = nil
+  rescue ArgumentError
+    render json: { error: 'Wrong format' }, status: :unprocessable_entity
   end
 
   def folder_exists?(folder_id)

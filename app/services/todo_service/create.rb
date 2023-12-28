@@ -1,6 +1,7 @@
 # rubocop:disable Style/ClassAndModuleChildren
 class TodoService::Create
   attr_accessor :params, :todo
+
   def initialize(params, current_user = nil)
     @params = params
     @current_user = current_user
@@ -64,6 +65,36 @@ class TodoService::Create
     { folder: folder.as_json(only: [:id, :name, :created_at, :updated_at]) }
   rescue ActiveRecord::RecordInvalid, ActiveRecord::RecordNotUnique => e
     { error: e.message }
+  end
+
+  # New method to create a todo with a folder
+  def self.create_with_folder(title:, description:, folder_id:)
+    return send_response('Title cannot be blank') if title.blank?
+    return send_response('Folder does not exist') unless Folder.exists?(folder_id)
+
+    todo = Todo.create!(
+      title: title,
+      description: description,
+      folder_id: folder_id
+    )
+
+    {
+      id: todo.id,
+      title: todo.title,
+      description: todo.description,
+      status: todo.status,
+      created_at: todo.created_at,
+      updated_at: todo.updated_at
+    }
+  rescue ActiveRecord::RecordInvalid => e
+    send_response(e.message)
+  end
+
+  private
+
+  # Reusing existing send_response method for consistency
+  def self.send_response(message)
+    { error: message }
   end
 end
 
