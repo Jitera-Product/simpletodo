@@ -5,6 +5,7 @@ class Todo < ApplicationRecord
   validates :due_date, presence: true
   validates :priority, presence: true
   validates :status, presence: true
+  validates :recurrence, presence: true # Assuming recurrence is a required field
   # end for validations
 
   # relationships
