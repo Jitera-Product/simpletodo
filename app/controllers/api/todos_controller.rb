@@ -1,6 +1,6 @@
 class Api::TodosController < Api::BaseController
   before_action :doorkeeper_authorize!, only: %i[create destroy cancel_deletion]
-  before_action :authenticate_user!, only: [:index]
+  before_action :authenticate_user!, only: [:index, :destroy] # Added :destroy to ensure user is authenticated
   before_action :set_folder, only: [:index]
 
   def index
@@ -18,12 +18,16 @@ class Api::TodosController < Api::BaseController
   end
 
   def destroy
-    @todo = TodoService::ValidateTodo.new(params[:id], current_resource_owner.id).execute
-    if @todo
-      message = TodoService::Delete.new(params[:id], current_resource_owner.id).execute
-      render json: { status: 200, message: message }, status: :ok
+    todo_id = params[:id].to_i
+    return render json: { error: 'Invalid ID format.' }, status: :bad_request unless todo_id.is_a?(Integer) && todo_id > 0
+
+    @todo = Todo.find_by(id: todo_id, user_id: current_resource_owner.id) # Ensuring that the todo belongs to the current user
+    return render json: { error: 'Todo item not found.' }, status: :not_found unless @todo
+
+    if @todo.destroy # Using ActiveRecord's destroy method to delete the todo
+      render json: { status: 200, message: 'Todo item successfully deleted.' }, status: :ok
     else
-      render json: { error: 'This to-do item is not found' }, status: :unprocessable_entity
+      render json: { error: 'Failed to delete todo item.' }, status: :internal_server_error
     end
   end
 
