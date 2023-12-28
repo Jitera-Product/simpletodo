@@ -1,5 +1,5 @@
 class Api::UsersController < Api::BaseController
-  before_action :doorkeeper_authorize!, only: %i[create update destroy]
+  before_action :doorkeeper_authorize!, only: %i[create update destroy create_folder]
   def register
     user_params = params.require(:user).permit(:email, :password)
     begin
@@ -73,6 +73,31 @@ class Api::UsersController < Api::BaseController
       render json: { status: 500, message: "An unexpected error occurred on the server." }, status: :internal_server_error
     end
   end
+
+  # POST /api/users/:user_id/folders
+  def create_folder
+    user = User.find(params[:user_id])
+    folder_name = params.require(:name)
+    if folder_name.blank? || user.blank?
+      render json: { status: 400, message: "Name and user_id are required." }, status: :bad_request
+      return
+    end
+    if folder_exists?(user.id, folder_name)
+      render json: { status: 400, message: "Folder with the given name already exists." }, status: :bad_request
+    else
+      folder = user.folders.build(name: folder_name)
+      if folder.save
+        render json: folder.as_json(only: [:id, :name, :created_at, :updated_at]), status: :created
+      else
+        render json: { status: 422, message: folder.errors.full_messages }, status: :unprocessable_entity
+      end
+    end
+  rescue ActiveRecord::RecordNotFound
+    render json: { status: 404, message: "User not found." }, status: :not_found
+  rescue StandardError => e
+    render json: { status: 500, message: e.message }, status: :internal_server_error
+  end
+
   private
   def execute_register(user_params)
     user = User.new(user_params)
@@ -92,5 +117,8 @@ class Api::UsersController < Api::BaseController
     user.generate_confirmation_token!
     UserMailer.confirmation_instructions(user, user.confirmation_token).deliver_now
     { success: "Confirmation email resent. Please check your email." }
+  end
+  def folder_exists?(user_id, folder_name)
+    Folder.exists?(user_id: user_id, name: folder_name)
   end
 end
