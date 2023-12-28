@@ -12,11 +12,17 @@ class Api::TodosController < Api::BaseController
   end
 
   def create
-    @todo = TodoService::Create.new(create_params, current_resource_owner).execute
-    if @todo
-      render :show, status: :created
+    if todo_params[:title].blank?
+      render json: { error: 'The title is required.' }, status: :bad_request
+    elsif !folder_exists?(todo_params[:folder_id])
+      render json: { error: 'Folder not found.' }, status: :unprocessable_entity
     else
-      render json: { error: 'Failed to create todo' }, status: :unprocessable_entity
+      @todo = TodoService::Create.new(todo_params, current_resource_owner).execute
+      if @todo.persisted?
+        render json: { status: 201, todo: @todo.as_json(only: %i[id title description folder_id created_at]) }, status: :created
+      else
+        render json: { error: 'Failed to create todo' }, status: :unprocessable_entity
+      end
     end
   end
 
@@ -93,6 +99,10 @@ class Api::TodosController < Api::BaseController
 
   def folder_exists?(folder_id)
     Folder.exists?(folder_id)
+  end
+
+  def todo_params
+    params.require(:todo).permit(:title, :description, :folder_id)
   end
 
   def create_params
