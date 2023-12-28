@@ -18,14 +18,15 @@ Rails.application.routes.draw do
       end
     end
 
-    resources :todos, only: [:create, :destroy] do
+    resources :todos, only: [:index, :create, :destroy] do
       member do
         post :cancel_deletion
         put :recover
       end
+      collection do
+        get '/', to: 'todos#index' # This line is added to handle the GET request for listing todos with folder_id
+      end
     end
-
-    # Added new route for FoldersController#index as per requirement
-    get '/folders', to: 'folders#index', as: :user_folders
+    # ... other routes
   end
 end
