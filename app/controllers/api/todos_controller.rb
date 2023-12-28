@@ -1,7 +1,8 @@
 class Api::TodosController < Api::BaseController
-  before_action :doorkeeper_authorize!, only: %i[create destroy cancel_deletion]
-  before_action :authenticate_user!, only: [:index, :create] # Added :create to ensure user is authenticated
-  before_action :set_folder, only: [:index, :create] # Updated to include :create action
+  before_action :doorkeeper_authorize!, only: %i[create destroy cancel_deletion update]
+  before_action :authenticate_user!, only: [:index]
+  before_action :set_folder, only: [:index]
+  before_action :set_todo, only: [:update]
 
   def index
     todos = @folder.todos.select(:id, :title, :description, :due_date, :priority, :status)
@@ -9,17 +10,11 @@ class Api::TodosController < Api::BaseController
   end
 
   def create
-    # Validate create_params before proceeding
-    validator = TodoValidator.new(create_params)
-    unless validator.valid?
-      render json: { errors: validator.errors }, status: :unprocessable_entity and return
-    end
-
-    @todo = TodoService::Create.new(create_params.merge(user_id: current_resource_owner.id), current_resource_owner).execute
-    if @todo.persisted?
-      render json: { status: 201, todo: @todo.as_json }, status: :created, location: api_todo_url(@todo)
+    @todo = TodoService::Create.new(create_params, current_resource_owner).execute
+    if @todo
+      render :show, status: :created
     else
-      render json: { errors: @todo.errors.full_messages }, status: :unprocessable_entity
+      render json: { error: 'Failed to create todo' }, status: :unprocessable_entity
     end
   end
 
@@ -42,56 +37,51 @@ class Api::TodosController < Api::BaseController
     end
   end
 
+  def update
+    if @todo.update(update_params)
+      render json: { status: 200, todo: @todo.as_json.merge(updated_at: Time.zone.now) }, status: :ok
+    else
+      render json: { errors: @todo.errors.full_messages }, status: :unprocessable_entity
+    end
+  end
+
   private
 
   def authenticate_user!
-    # Assuming UserService::SignIn#execute exists and returns the user if authenticated
     @current_user = UserService::SignIn.execute(session_or_token)
     render json: { error: 'Not Authenticated' }, status: :unauthorized unless @current_user
   end
 
   def set_folder
-    @folder = Folder.find_by(id: params[:folder_id], user_id: current_resource_owner.id)
+    @folder = Folder.find_by(id: params[:folder_id], user_id: @current_user.id)
     unless @folder
       render json: { error: 'Folder not found or not owned by user' }, status: :not_found
     end
   end
 
+  def set_todo
+    @todo = current_resource_owner.todos.find_by(id: params[:id])
+    render json: { error: 'Todo item not found.' }, status: :not_found unless @todo
+  end
+
   def create_params
-    # Merged the new and existing create_params
-    params.require(:todo).permit(:title, :description, :due_date, :category, :priority, :recurring, :attachment, :status, :folder_id)
-  end
-end
-
-# Validator class to handle the validation logic
-class TodoValidator
-  include ActiveModel::Validations
-
-  validates :title, presence: { message: 'The title is required.' }, length: { maximum: 200, too_long: 'The title cannot exceed 200 characters.' }
-  validates :description, length: { maximum: 1000, too_long: 'The description cannot exceed 1000 characters.' }
-  validates :due_date, presence: true, date: { message: 'Invalid due date format.' }
-  validates :priority, numericality: { only_integer: true, message: 'Invalid priority format.' }
-  validates :status, numericality: { only_integer: true, message: 'Invalid status format.' }
-  validate :folder_exists
-  validate :user_exists
-
-  attr_accessor :title, :description, :due_date, :priority, :status, :folder_id, :user_id
-
-  def initialize(params = {})
-    @title = params[:title]
-    @description = params[:description]
-    @due_date = params[:due_date]
-    @priority = params[:priority]
-    @status = params[:status]
-    @folder_id = params[:folder_id]
-    @user_id = params[:user_id]
+    params.require(:todo).permit(:title, :description, :due_date, :category, :priority, :recurring, :attachment)
   end
 
-  def folder_exists
-    errors.add(:folder_id, 'Folder not found.') unless Folder.exists?(id: folder_id)
+  def update_params
+    params.require(:todo).permit(:title, :description, :due_date, :priority, :status).tap do |whitelisted|
+      validate_update_params!(whitelisted)
+    end
   end
 
-  def user_exists
-    errors.add(:user_id, 'User not found.') unless User.exists?(id: user_id)
+  def validate_update_params!(params)
+    errors = []
+    errors << 'Invalid ID format.' unless params[:id].to_i.to_s == params[:id].to_s
+    errors << 'The title cannot exceed 200 characters.' if params[:title].length > 200
+    errors << 'The description cannot exceed 1000 characters.' if params[:description].length > 1000
+    errors << 'Invalid due date format.' unless params[:due_date].is_a?(DateTime)
+    errors << 'Invalid priority format.' unless params[:priority].to_i.to_s == params[:priority].to_s
+    errors << 'Invalid status format.' unless params[:status].to_i.to_s == params[:status].to_s
+    render json: { errors: errors }, status: :unprocessable_entity if errors.any?
   end
 end
