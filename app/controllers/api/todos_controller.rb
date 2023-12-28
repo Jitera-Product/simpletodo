@@ -63,19 +63,16 @@ class Api::TodosController < Api::BaseController
 
   def destroy
     if @todo
-      begin
-        message = TodoService::Delete.new(params[:id], current_resource_owner.id).execute
-        render json: { status: 200, message: message }, status: :ok
-      rescue ActiveRecord::RecordNotFound
-        render json: { error: 'Todo not found' }, status: :not_found
-      rescue ArgumentError
-        render json: { error: 'Wrong format' }, status: :unprocessable_entity
-      rescue StandardError => e
-        render json: { error: e.message }, status: :internal_server_error
+      if @todo.destroy
+        render json: { message: 'Todo successfully deleted' }, status: :ok
+      else
+        render json: { error: 'Failed to delete todo' }, status: :unprocessable_entity
       end
     else
-      render json: { error: 'Todo item not found or does not belong to the user' }, status: :not_found
+      render json: { error: 'Todo not found' }, status: :not_found
     end
+  rescue StandardError => e
+    render json: { error: e.message }, status: :internal_server_error
   end
 
   def cancel_deletion
@@ -90,11 +87,8 @@ class Api::TodosController < Api::BaseController
   private
 
   def set_todo
-    @todo = TodoService::ValidateTodo.new(params[:id], current_resource_owner.id).execute
-  rescue ActiveRecord::RecordNotFound
-    render json: { error: 'Todo not found' }, status: :not_found
-  rescue ArgumentError
-    render json: { error: 'Wrong format' }, status: :unprocessable_entity
+    @todo = Todo.find_by(id: params[:id], user_id: current_resource_owner.id)
+    render json: { error: 'Todo not found' }, status: :not_found if @todo.nil?
   end
 
   def folder_exists?(folder_id)
