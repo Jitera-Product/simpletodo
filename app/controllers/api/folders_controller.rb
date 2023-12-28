@@ -1,12 +1,23 @@
-# FILE PATH: /app/controllers/api/folders_controller.rb
 class Api::FoldersController < Api::BaseController
-  before_action :doorkeeper_authorize!, only: [:index]
+  before_action :doorkeeper_authorize!, only: [:destroy]
 
-  def index
-    # Ensure that we are getting the user_id from the authenticated user
-    user_id = current_user.id
-    # Retrieve folders for the authenticated user
-    folders = Folder.where(user_id: user_id).select(:id, :name)
-    render json: folders, status: :ok
+  # DELETE /api/folders/:id
+  def destroy
+    folder = set_folder
+    if folder
+      FolderService::DeleteTodos.new(folder.id).execute
+      folder.destroy!
+      render json: { message: 'Folder and all associated todos have been successfully deleted.' }, status: :ok
+    else
+      render json: { error: 'Folder not found or not owned by the user.' }, status: :not_found
+    end
+  rescue ActiveRecord::RecordNotDestroyed
+    render json: { error: 'Failed to delete folder.' }, status: :unprocessable_entity
+  end
+
+  private
+
+  def set_folder
+    current_user.folders.find_by(id: params[:id])
   end
 end
