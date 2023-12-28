@@ -1,32 +1,35 @@
-# FILE PATH: /app/controllers/api/folders_controller.rb
+# typed: ignore
 module Api
-  class FoldersController < Api::BaseController
-    before_action :doorkeeper_authorize!, only: [:destroy]
-    before_action :validate_folder_id_format, only: [:destroy]
+  class FoldersController < BaseController
+    before_action :authenticate_user!
+    before_action :set_folder, only: [:deletion_exceptions]
+    before_action :authorize_folder, only: [:deletion_exceptions]
 
-    def destroy
-      folder = Folder.find_by(id: params[:folder_id])
-      return render json: { error: "Folder not found." }, status: :not_found unless folder
-
-      if current_user.can_delete_folder?(folder)
-        begin
-          TodoService::DeleteTodosInFolder.new(folder.id).call
-          folder.destroy
-          render json: { message: "Folder and its todo items have been successfully deleted." }, status: :ok
-        rescue => e
-          render json: { error: e.message }, status: :internal_server_error
-        end
+    # GET /api/folders/:id/deletion_exceptions
+    def deletion_exceptions
+      # Business logic to check for deletion exceptions
+      if @folder.todos.any? { |todo| todo.deletion_exception? }
+        render json: { status: 500, message: "An error occurred during the deletion process. Please try again later." }, status: :internal_server_error
       else
-        render json: { error: "You do not have permission to delete this folder." }, status: :forbidden
+        render json: { status: 200, message: "No exceptions occurred during the deletion process." }, status: :ok
       end
     end
 
     private
 
-    def validate_folder_id_format
-      unless params[:folder_id].to_s.match?(/\A\d+\z/)
-        render json: { error: "Invalid folder ID format." }, status: :bad_request
+    def set_folder
+      @folder = Folder.find_by(id: params[:id])
+      unless @folder
+        render json: { message: "Folder not found." }, status: :not_found
       end
+    end
+
+    def authorize_folder
+      authorize @folder, :deletion_exceptions?
+    end
+
+    def folder_params
+      params.permit(:id)
     end
   end
 end
