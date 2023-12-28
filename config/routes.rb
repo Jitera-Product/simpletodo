@@ -21,5 +21,7 @@ Rails.application.routes.draw do
         put :recover
       end
     end
+    # Added index action for todos within a folder
+    get '/folders/:folder_id/todos', to: 'todos#index'
   end
 end
