@@ -41,38 +41,43 @@ class Api::TodosController < Api::BaseController
       render json: { error: 'The title is required.' }, status: :unprocessable_entity
       return
     elsif update_params[:title].length > 200
-      render json: { error: 'You cannot input more than 200 characters.' }, status: :unprocessable_entity
+      render json: { error: 'The title cannot be more than 200 characters.' }, status: :unprocessable_entity
       return
     end
 
-    if update_params[:description].length > 1000
-      render json: { error: 'You cannot input more than 1000 characters.' }, status: :unprocessable_entity
+    if update_params[:description].present? && update_params[:description].length > 1000
+      render json: { error: 'The description cannot be more than 1000 characters.' }, status: :unprocessable_entity
       return
     end
 
-    if @todo.update(update_params)
-      render :show, status: :ok
-    else
-      render json: { error: 'Failed to update todo' }, status: :unprocessable_entity
+    begin
+      if @todo.update(update_params)
+        render json: @todo.as_json(only: %i[id title description status updated_at]), status: :ok
+      else
+        render json: { error: 'Failed to update todo' }, status: :unprocessable_entity
+      end
+    rescue ActiveRecord::RecordNotFound
+      render json: { error: 'Todo not found' }, status: :not_found
+    rescue StandardError => e
+      render json: { error: e.message }, status: :internal_server_error
     end
-  rescue ActiveRecord::RecordNotFound
-    render json: { error: 'Todo not found' }, status: :not_found
-  rescue StandardError => e
-    render json: { error: e.message }, status: :internal_server_error
   end
 
   def destroy
     if @todo
-      if @todo.destroy
-        render json: { message: 'Todo successfully deleted' }, status: :ok
-      else
-        render json: { error: 'Failed to delete todo' }, status: :unprocessable_entity
+      begin
+        message = TodoService::Delete.new(params[:id], current_resource_owner.id).execute
+        render json: { status: 200, message: message }, status: :ok
+      rescue ActiveRecord::RecordNotFound
+        render json: { error: 'Todo not found' }, status: :not_found
+      rescue ArgumentError
+        render json: { error: 'Wrong format' }, status: :unprocessable_entity
+      rescue StandardError => e
+        render json: { error: e.message }, status: :internal_server_error
       end
     else
-      render json: { error: 'Todo not found' }, status: :not_found
+      render json: { error: 'Todo item not found or does not belong to the user' }, status: :not_found
     end
-  rescue StandardError => e
-    render json: { error: e.message }, status: :internal_server_error
   end
 
   def cancel_deletion
@@ -87,7 +92,7 @@ class Api::TodosController < Api::BaseController
   private
 
   def set_todo
-    @todo = Todo.find_by(id: params[:id], user_id: current_resource_owner.id)
+    @todo = current_resource_owner.todos.find_by(id: params[:id])
     render json: { error: 'Todo not found' }, status: :not_found if @todo.nil?
   end
 
