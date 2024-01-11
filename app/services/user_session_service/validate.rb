@@ -4,15 +4,21 @@ class UserSessionService::Validate
   def initialize(session_token)
     @session_token = session_token
   end
+  
   def execute
-    user = User.find_by(session_token: session_token)
-    if user.nil?
-      { status: false, error: 'Invalid session token' }
-    elsif user.session_expired?
-      { status: false, error: 'Session token expired' }
+    auth_token = AuthenticationToken.find_by(token: session_token, 'expires_at > ?', Time.current)
+
+    return { status: false, error: 'Invalid or expired session token' } if auth_token.nil?
+
+    user = User.find_by(id: auth_token.user_id)
+
+    if user.nil? || !user.email_confirmed
+      { status: false, error: 'User not found or email not confirmed' }
     else
       { status: true }
     end
+  rescue => e
+    { status: false, error: e.message }
   end
 end
 # rubocop:enable Style/ClassAndModuleChildren
