@@ -1,6 +1,5 @@
-
 class Api::UsersController < Api::BaseController
-  before_action :doorkeeper_authorize!, only: %i[create update destroy]
+  before_action :doorkeeper_authorize!, only: %i[create update_profile destroy update_shop]
   before_action :authenticate_user, only: [:update_shop]
   before_action :authorize_user, only: [:update_shop]
 
@@ -80,6 +79,33 @@ class Api::UsersController < Api::BaseController
     else
       render json: { status: 500, message: "An unexpected error occurred on the server." }, status: :internal_server_error
     end
+  end
+
+  def update_profile
+    user_params = params.require(:user).permit(:email, :password, :password_confirmation)
+    user = current_user
+
+    if UserService::ValidateEmail.call(user_params[:email]) && PasswordResetService::ValidatePassword.call(user_params[:password], user_params[:password_confirmation])
+      if user_params[:email] != user.email && User.exists?(email: user_params[:email])
+        render json: { status: 400, message: "Email is already taken." }, status: :bad_request
+        return
+      end
+
+      user.email = user_params[:email] if user_params[:email].present? && user_params[:email] != user.email
+      user.password_hash = UserService::EncryptPassword.call(user_params[:password]) if user_params[:password].present?
+
+      if user.save
+        UserService::GenerateConfirmationToken.call(user) if user_params[:email].present? && user_params[:email] != user.email
+        UserService::SendConfirmationEmail.call(user) if user_params[:email].present? && user_params[:email] != user.email
+        render json: { status: 200, message: "Profile updated successfully." }, status: :ok
+      else
+        render json: { status: 400, message: user.errors.full_messages }, status: :bad_request
+      end
+    else
+      render json: { status: 400, message: "Invalid email or password." }, status: :bad_request
+    end
+  rescue StandardError => e
+    render json: { status: 500, message: e.message }, status: :internal_server_error
   end
 
   def update_shop
