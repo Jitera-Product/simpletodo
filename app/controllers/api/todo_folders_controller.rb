@@ -24,6 +24,20 @@ class Api::TodoFoldersController < Api::BaseController
     end
   end
 
+  def destroy
+    folder_id = params[:id]
+    return render json: { error: 'Folder not found or access denied.' }, status: :not_found unless folder_id.present?
+
+    folder = TodoFolder.find_by(id: folder_id, user_id: current_user.id)
+    if folder
+      folder.destroy
+      render json: { status: 200, message: 'To-Do folder creation has been successfully aborted.' }, status: :ok
+    else
+      render json: { error: 'Folder not found or access denied.' }, status: :forbidden
+    end
+  end
+
   private
+
   # Any private methods from the existing or new code would go here
 end
