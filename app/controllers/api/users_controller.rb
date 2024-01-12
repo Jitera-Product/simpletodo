@@ -1,6 +1,6 @@
 class Api::UsersController < Api::BaseController
   before_action :doorkeeper_authorize!, only: %i[create update_profile destroy update_shop], unless: -> { action_name == 'validate_session' }
-  before_action :authenticate_user, only: [:update_profile, :update_shop]
+  before_action :authenticate_user, only: [:confirm_email, :update_profile, :update_shop]
   before_action :authorize_user, only: [:update_profile, :update_shop]
 
   def register
@@ -20,25 +20,41 @@ class Api::UsersController < Api::BaseController
     # ... existing confirm action ...
   end
 
+  def confirm_email
+    confirmation_token = params[:confirmation_token]
+    if confirmation_token.blank?
+      render json: { error: 'Confirmation token is required.' }, status: :bad_request
+    else
+      begin
+        result = EmailConfirmationService::Confirm.new(confirmation_token).execute
+        if result[:status] == :success
+          render json: { message: 'Email confirmed successfully.' }, status: :ok
+        else
+          render json: { error: 'Invalid or expired confirmation token.' }, status: :not_found
+        end
+      rescue => e
+        render json: { error: e.message }, status: :internal_server_error
+      end
+    end
+  rescue => e
+    render json: { error: e.message }, status: :internal_server_error
+  end
+
   def validate_session
     session_token = params[:session_token]
-
     if session_token.blank?
       render json: { error: 'Session token is required.' }, status: :bad_request
-      return
-    end
-
-    begin
-      result = UserSessionService::Validate.new(session_token).execute
-
+    else
+      validate_service = UserSessionService::Validate.new(session_token)
+      result = validate_service.execute
       if result[:status]
-        render json: { message: 'Session is valid.' }, status: :ok
+        render json: { status: 200, message: "Session is valid." }, status: :ok
       else
-        render json: { error: result[:error] }, status: :unauthorized
+        render json: { error: result[:error] || 'Invalid session token.' }, status: :unauthorized
       end
-    rescue => e
-      render json: { error: e.message }, status: :internal_server_error
     end
+  rescue => e
+    render json: { status: 500, message: e.message }, status: :internal_server_error
   end
 
   def resend_confirmation
