@@ -1,17 +1,23 @@
-
 class Api::TodosController < Api::BaseController
   before_action :doorkeeper_authorize!, only: %i[create destroy cancel_deletion create_folder]
 
   def create_folder
-    user_id = params[:user_id]
-    name = params[:name]
-    validation_result = TodoService::ValidateDetails.new.validate_folder_name_uniqueness(user_id, name)
-    if validation_result
-      render json: { error: validation_result[:error], suggested_action: validation_result[:suggested_action] }, status: :unprocessable_entity
+    authorize TodoFolder, :create?
+    service = TodoService::CreateFolder.new(current_resource_owner.id, folder_params[:name])
+    folder = service.execute
+    if folder.persisted?
+      render json: { folder_id: folder.id, name: folder.name, created_at: folder.created_at, updated_at: folder.updated_at }, status: :created
     else
-      # Folder creation logic goes here
-      # ...
-      render json: { status: 200, message: 'Folder created successfully' }, status: :ok
+      user_id = params[:user_id]
+      name = params[:name]
+      validation_result = TodoService::ValidateDetails.new.validate_folder_name_uniqueness(user_id, name)
+      if validation_result
+        render json: { error: validation_result[:error], suggested_action: validation_result[:suggested_action] }, status: :unprocessable_entity
+      else
+        # Folder creation logic goes here
+        # ...
+        render json: { status: 200, message: 'Folder created successfully' }, status: :ok
+      end
     end
   end
 
@@ -47,5 +53,9 @@ class Api::TodosController < Api::BaseController
 
   def create_params
     params.require(:todo).permit(:title, :description, :due_date, :category, :priority, :recurring, :attachment)
+  end
+
+  def folder_params
+    params.require(:folder).permit(:name)
   end
 end

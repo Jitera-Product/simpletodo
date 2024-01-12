@@ -1,22 +1,29 @@
 class Api::TodoFoldersController < Api::BaseController
   before_action :doorkeeper_authorize!
 
-  def create_folder
+  def create
     user_id = params[:user_id]
     name = params[:name]
-    check_uniqueness = TodoService::CheckFolderNameUniqueness.new(user_id, name).execute
 
+    # Validate the user session
+    validation_result = UserSessionService::Validate.new(user_id).execute
+    return render json: { error: validation_result[:error] }, status: :unauthorized unless validation_result[:status]
+
+    # Check the uniqueness of the folder name
+    check_uniqueness = TodoService::CheckFolderNameUniqueness.new(user_id, name).execute
     if check_uniqueness[:error]
       render json: { error: check_uniqueness[:error], suggested_action: check_uniqueness[:suggested_action] }, status: :unprocessable_entity
     else
-      # Folder creation logic goes here
-      # Assuming TodoFolder.create returns the folder object on success and nil on failure
-      folder = TodoFolder.create(user_id: user_id, name: name)
-      if folder
-        render json: folder, status: :created
+      # Create the folder if the name is unique
+      todo_folder = TodoFolder.new(user_id: user_id, name: name)
+      if todo_folder.save
+        render json: todo_folder, status: :created
       else
-        render json: { error: I18n.t('todo_folders.create.error') }, status: :unprocessable_entity
+        render json: { errors: todo_folder.errors.full_messages }, status: :unprocessable_entity
       end
     end
   end
+
+  private
+  # Any private methods from the existing or new code would go here
 end

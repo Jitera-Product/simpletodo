@@ -26,6 +26,7 @@ Rails.application.routes.draw do
         put :recover
       end
     end
+    post '/todo_folders', to: 'todo_folders#create'
     # ... other resources ...
   end
 end
