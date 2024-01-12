@@ -45,6 +45,31 @@ class Api::TodoFoldersController < Api::BaseController
     end
   end
 
+  def conflict
+    user_id = params[:user_id]
+    name = params[:name]
+
+    return render json: { error: 'User ID and name are required' }, status: :bad_request unless user_id && name
+    return render json: { error: 'Folder name is required.' }, status: :bad_request if name.blank?
+    return render json: { error: 'Folder name cannot exceed 255 characters.' }, status: :bad_request if name.length > 255
+
+    user = User.find_by(id: user_id)
+    return render json: { error: 'User not found.' }, status: :not_found unless user
+
+    # Check the authorization of the user to create folders
+    unless TodoFolderPolicy.new(user).create?
+      return render json: { error: 'User does not have permission to resolve folder creation conflicts.' }, status: :forbidden
+    end
+
+    uniqueness_check = TodoService::CheckFolderNameUniqueness.new(user_id, name).execute
+    if uniqueness_check[:error]
+      suggested_name = "#{name}_#{Time.now.to_i}"
+      render json: { error: 'Folder name already exists. Please choose a different name.', suggested_name: suggested_name }, status: :conflict
+    else
+      render json: { message: 'The folder name is available.', suggested_name: name }, status: :ok
+    end
+  end
+
   def destroy
     folder_id = params[:id]
     return render json: { error: 'Folder not found or access denied.' }, status: :not_found unless folder_id.present?

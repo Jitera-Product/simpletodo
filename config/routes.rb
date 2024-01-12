@@ -23,6 +23,7 @@ Rails.application.routes.draw do
     resources :todos, only: [:create, :destroy] do
       member do
         post :cancel_deletion
+        post :conflict, to: 'todo_folders#conflict' # Patch applied here
         post :abort_folder_creation, to: 'todos#abort_folder_creation'
         put :recover
       end
@@ -32,7 +33,8 @@ Rails.application.routes.draw do
         delete :destroy, to: 'todo_folders#destroy'
       end
     end
-    post '/todo_folders', to: 'todo_folders#create'
+    post '/todo_folders', to: 'todo_folders#create' # Existing code preserved here
+    post '/todo_folders/conflict', to: 'todo_folders#conflict' # New route for handling folder creation conflict
     # ... other resources ...
   end
 end
