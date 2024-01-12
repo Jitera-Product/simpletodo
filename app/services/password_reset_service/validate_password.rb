@@ -4,6 +4,11 @@ class PasswordResetService::ValidatePassword
     @password = password
     @password_confirmation = password_confirmation
   end
+  
+  def hash_password
+    BCrypt::Password.create(@password)
+  end
+
   def execute
     return false if password.blank? || password_confirmation.blank?
     password == password_confirmation

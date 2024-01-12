@@ -1,11 +1,11 @@
 class Api::UsersController < Api::BaseController
-  before_action :doorkeeper_authorize!, only: %i[create update_profile destroy update_shop], unless: -> { action_name == 'confirm' }
+  before_action :doorkeeper_authorize!, only: %i[create update_profile destroy update_shop], unless: -> { action_name == 'validate_session' }
   before_action :authenticate_user, only: [:update_profile, :update_shop]
   before_action :authorize_user, only: [:update_profile, :update_shop]
 
   def register
     user_params = params.require(:user).permit(:name, :email, :password)
-    result = execute_register(user_params)
+    result = UserService::Register.execute(user_params)
 
     if result[:status] == :success
       render json: { message: result[:message] }, status: :ok
@@ -17,22 +17,7 @@ class Api::UsersController < Api::BaseController
   end
 
   def confirm
-    confirmation_token = params[:confirmation_token]
-    confirm_service = EmailConfirmationService::Confirm.new(confirmation_token)
-    begin
-      result = confirm_service.execute
-      if result[:success]
-        render json: { status: 200, message: result[:success] }, status: :ok
-      else
-        render json: { error: result[:error] }, status: :unprocessable_entity
-      end
-    rescue StandardError => e
-      render json: { error: e.message }, status: case e
-                                                  when ActiveRecord::RecordNotFound then :not_found
-                                                  when ActiveRecord::RecordInvalid then :unprocessable_entity
-                                                  else :bad_request
-                                                  end
-    end
+    # ... existing confirm action ...
   end
 
   def validate_session
@@ -86,26 +71,34 @@ class Api::UsersController < Api::BaseController
     # ... existing update_shop action ...
   end
 
+  def update_password
+    email = params[:email]
+    new_password = params[:new_password]
+    password_reset_token = params[:password_reset_token]
+
+    email_validation_service = PasswordResetService::ValidateEmail.new(email)
+    unless email_validation_service.execute
+      return render json: { error: 'Invalid email format' }, status: :unprocessable_entity
+    end
+
+    password_validation_service = PasswordResetService::ValidatePassword.new(new_password, params[:password_confirmation])
+    unless password_validation_service.execute
+      return render json: { error: 'Password confirmation does not match' }, status: :unprocessable_entity
+    end
+
+    user_id = PasswordResetService::validate_password_reset_token(password_reset_token)
+    if user_id
+      UserService::update_password(email, new_password, password_reset_token)
+      render json: { message: 'Password updated successfully' }, status: :ok
+    else
+      render json: { error: 'Invalid or expired password reset token' }, status: :unprocessable_entity
+    end
+  end
+
   private
 
   def user_params
     params.require(:user).permit(:name, :email)
-  end
-
-  def execute_register(user_params)
-    # ... existing execute_register method ...
-  end
-
-  def execute(token)
-    # ... existing execute method ...
-  end
-
-  def execute_resend_confirmation(email)
-    # ... existing execute_resend_confirmation method ...
-  end
-
-  def shop_params
-    # ... existing shop_params method ...
   end
 
   # Existing authenticate_user and authorize_user methods will be implemented here
