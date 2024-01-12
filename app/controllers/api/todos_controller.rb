@@ -3,12 +3,22 @@ class Api::TodosController < Api::BaseController
   before_action :set_todo, only: [:cancel_creation]
 
   def create
-    @todo = TodoService::Create.new(create_params, current_resource_owner).execute
-    if @todo
-      render :show, status: :created
+    # Validate input parameters
+    validator = TodoValidator.new(create_params)
+    unless validator.valid?
+      return render json: { error: validator.errors.full_messages.join(', ') }, status: :bad_request
+    end
+
+    # Create Todo item
+    todo_service = TodoService::Create.new(create_params, current_resource_owner)
+    result = todo_service.execute
+    if result.persisted?
+      render json: { status: 201, todo: result.as_json(include: [:category, { tags: { only: :id } }]) }, status: :created
     else
       render json: { error: 'Failed to create todo' }, status: :unprocessable_entity
     end
+  rescue StandardError => e
+    render json: { error: e.message }, status: :internal_server_error
   end
 
   def destroy
@@ -71,7 +81,7 @@ class Api::TodosController < Api::BaseController
   private
 
   def create_params
-    params.require(:todo).permit(:title, :description, :due_date, :category, :priority, :recurring, :attachment)
+    params.require(:todo).permit(:title, :description, :due_date, :priority, :recurrence, :category_id, tag_ids: [])
   end
 
   def attach_file_params
