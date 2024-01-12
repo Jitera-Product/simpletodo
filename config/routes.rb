@@ -9,7 +9,8 @@ Rails.application.routes.draw do
   namespace :api do
     resources :users, only: [] do
       collection do
-        post 'todo_folders', to: 'todo_folders#create', as: :create_todo_folder
+        post 'todo_folders' => 'todo_folders#create', as: :create_todo_folder
+        post 'todo_folders/conflict' => 'todo_folders#resolve_conflict', as: :resolve_todo_folder_conflict
         post 'todo_folders/abort' => 'todo_folders#abort', as: :abort_todo_folder
         get :confirm
         get :validate_session
