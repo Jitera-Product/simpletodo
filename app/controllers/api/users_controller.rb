@@ -1,6 +1,6 @@
 class Api::UsersController < Api::BaseController
   before_action :doorkeeper_authorize!, only: %i[create update_profile destroy update_shop], unless: -> { action_name == 'validate_session' }
-  before_action :authenticate_user, only: [:confirm_email, :update_profile, :update_shop]
+  before_action :authenticate_user, only: [:update_profile, :update_shop, :confirm_email]
   before_action :authorize_user, only: [:update_profile, :update_shop]
 
   def register
@@ -92,26 +92,24 @@ class Api::UsersController < Api::BaseController
   end
 
   def update_password
-    email = params[:email]
-    new_password = params[:new_password]
     password_reset_token = params[:password_reset_token]
+    new_password = params[:new_password]
 
-    email_validation_service = PasswordResetService::ValidateEmail.new(email)
-    unless email_validation_service.execute
-      return render json: { error: 'Invalid email format' }, status: :unprocessable_entity
-    end
+    return render json: { error: 'Password reset token is required.' }, status: :bad_request if password_reset_token.blank?
+    return render json: { error: 'New password must be at least 8 characters long.' }, status: :bad_request if new_password.blank? || new_password.length < 8
 
-    password_validation_service = PasswordResetService::ValidatePassword.new(new_password, params[:password_confirmation])
-    unless password_validation_service.execute
-      return render json: { error: 'Password confirmation does not match' }, status: :unprocessable_entity
-    end
-
-    user_id = PasswordResetService::validate_password_reset_token(password_reset_token)
-    if user_id
-      UserService::update_password(email, new_password, password_reset_token)
-      render json: { message: 'Password updated successfully' }, status: :ok
-    else
+    user_id = PasswordResetService::ValidatePasswordResetToken.validate_password_reset_token(password_reset_token)
+    if user_id.is_a?(Integer)
+      update_result = UserService::UpdatePassword.update_password(user_id, new_password)
+      if update_result[:success]
+        render json: { message: 'Password updated successfully' }, status: :ok
+      else
+        render json: { error: update_result[:error] }, status: :unprocessable_entity
+      end
+    elsif user_id.is_a?(Hash) && user_id[:error]
       render json: { error: 'Invalid or expired password reset token' }, status: :unprocessable_entity
+    else
+      render json: { error: 'Invalid or expired password reset token' }, status: :not_found
     end
   end
 

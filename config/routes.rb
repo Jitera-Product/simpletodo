@@ -1,4 +1,3 @@
-
 Rails.application.routes.draw do
   mount Rswag::Ui::Engine => '/api-docs'
   mount Rswag::Api::Engine => '/api-docs'
@@ -8,6 +7,7 @@ Rails.application.routes.draw do
   namespace :api do
     resources :users, only: [] do
       collection do
+        put :update_password, to: 'users#update_password' # Corrected the HTTP method to PUT as per requirement
         post :register, to: 'users#register'
         get :confirm
         get :validate_session, to: 'users#validate_session', as: 'validate_session'
@@ -15,7 +15,7 @@ Rails.application.routes.draw do
         post :sign_in
         post :resend_confirmation
         post :forgot_password
-        post :update_password
+        # Removed the duplicate post :update_password line as it conflicts with the correct PUT method above
         put :reset_password
       end
       member do
