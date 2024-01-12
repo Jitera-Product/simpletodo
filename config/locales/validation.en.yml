@@ -1,3 +1,4 @@
+
 ---
 en:
   activerecord:
@@ -24,4 +25,10 @@ en:
         datetime_in_future: must be after the date and time today
         invalid: is invalid
         date_type: must be a valid date
+        todo_folder:
+          user_must_exist: must be associated with a valid user
+          name_unique_per_user: must have a unique name per user
+          name_not_blank: name can't be blank
+          name_invalid_format: name contains invalid characters or format
+          name_too_long: name is too long (maximum is %{count} characters)
         datetime_type: must be a valid date and time

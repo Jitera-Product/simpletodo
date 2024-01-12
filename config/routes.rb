@@ -1,12 +1,15 @@
 require 'sidekiq/web'
+
 Rails.application.routes.draw do
   mount Rswag::Ui::Engine => '/api-docs'
   mount Rswag::Api::Engine => '/api-docs'
   get '/health' => 'pages#health_check'
   get 'api-docs/v1/swagger.yaml' => 'swagger#yaml'
+
   namespace :api do
     resources :users, only: [] do
       collection do
+        post :create, to: 'todo_folders#create' # New code addition
         get :confirm
         get :validate_session
         post :sign_in
@@ -15,10 +18,11 @@ Rails.application.routes.draw do
         put :reset_password
       end
     end
+
     resources :todos, only: [:create, :destroy] do
       member do
         post :cancel_deletion
-        post :abort_creation
+        post :abort_creation # Existing code addition
         put :recover
       end
     end
