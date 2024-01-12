@@ -10,6 +10,15 @@ class TodoService::ValidateDetails
   end
   private
   def title_unique
+    
+  end
+
+  def validate_folder_name(name)
+    return { error: I18n.t('activerecord.errors.messages.blank') } if name.blank?
+    true
+  end
+
+  def title_unique
     Todo.where(user_id: details[:user_id], title: details[:title]).empty?
   end
   def due_date_valid

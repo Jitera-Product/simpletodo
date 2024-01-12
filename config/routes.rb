@@ -9,7 +9,8 @@ Rails.application.routes.draw do
   namespace :api do
     resources :users, only: [] do
       collection do
-        post :create, to: 'todo_folders#create' # New code addition
+        post 'todo_folders' => 'todo_folders#create', as: :create_todo_folder # New code addition
+        post :create, to: 'todo_folders#create' # Existing code addition, consider renaming or merging functionality
         get :confirm
         get :validate_session
         post :sign_in
