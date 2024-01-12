@@ -9,18 +9,39 @@ class Api::TodoFoldersController < Api::BaseController
     validation_result = UserSessionService::Validate.new(user_id).execute
     return render json: { error: validation_result[:error] }, status: :unauthorized unless validation_result[:status]
 
-    # Check the uniqueness of the folder name
+    # Validate user existence
+    user = User.find_by(id: user_id)
+    unless user
+      return render json: { error: 'User not found' }, status: :not_found
+    end
+
+    # Check the uniqueness of the folder name using the new service
     check_uniqueness = TodoService::CheckFolderNameUniqueness.new(user_id, name).execute
     if check_uniqueness[:error]
-      render json: { error: check_uniqueness[:error], suggested_action: check_uniqueness[:suggested_action] }, status: :unprocessable_entity
+      return render json: { error: check_uniqueness[:error], suggested_action: check_uniqueness[:suggested_action] }, status: :unprocessable_entity
+    end
+
+    # Validate folder name presence
+    if name.blank?
+      return render json: { error: 'Folder name is required.' }, status: :bad_request
+    end
+
+    # Validate folder name length
+    if name.length > 255
+      return render json: { error: 'Folder name cannot exceed 255 characters.' }, status: :bad_request
+    end
+
+    # Check the authorization of the user to create folders
+    unless TodoFolderPolicy.new(user).create?
+      return render json: { error: 'User not authorized to create folders' }, status: :forbidden
+    end
+
+    # Create the folder if the name is unique and user is authorized
+    todo_folder = user.todo_folders.new(name: name)
+    if todo_folder.save
+      render json: { status: 201, todo_folder: todo_folder }, status: :created
     else
-      # Create the folder if the name is unique
-      todo_folder = TodoFolder.new(user_id: user_id, name: name)
-      if todo_folder.save
-        render json: todo_folder, status: :created
-      else
-        render json: { errors: todo_folder.errors.full_messages }, status: :unprocessable_entity
-      end
+      render json: { errors: todo_folder.errors.full_messages }, status: :unprocessable_entity
     end
   end
 

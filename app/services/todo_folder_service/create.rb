@@ -1,22 +1,38 @@
 # rubocop:disable Style/ClassAndModuleChildren
 class TodoFolderService::Create
+  MAX_FOLDER_NAME_LENGTH = 255
+
   def initialize(user_id, name)
     @user_id = user_id
-    @name = name
+    @name = name&.strip
   end
 
   def execute
-    user = User.find_by(id: @user_id)
-    return { status: false, error: 'Invalid user' } unless user
+    return { status: false, error: 'User not found.' } unless user_exists?
+    return { status: false, error: 'Folder name is required.' } if @name.blank?
+    return { status: false, error: 'Folder name cannot exceed 255 characters.' } if @name.length > MAX_FOLDER_NAME_LENGTH
+    return { status: false, error: 'Folder name already exists.' } if folder_name_exists?
 
-    if user.todo_folders.exists?(name: @name)
-      return { status: false, error: 'Folder name already exists' }
+    todo_folder = build_todo_folder
+    if todo_folder.save
+      { status: true, folder: todo_folder }
+    else
+      { status: false, error: todo_folder.errors.full_messages }
     end
+  end
 
-    todo_folder = user.todo_folders.build(name: @name)
-    return { status: true, folder: todo_folder } if todo_folder.save
+  private
 
-    { status: false, error: todo_folder.errors.full_messages }
+  def user_exists?
+    User.exists?(@user_id)
+  end
+
+  def folder_name_exists?
+    TodoFolder.exists?(name: @name, user_id: @user_id)
+  end
+
+  def build_todo_folder
+    User.find(@user_id).todo_folders.build(name: @name)
   end
 end
 # rubocop:enable Style/ClassAndModuleChildren

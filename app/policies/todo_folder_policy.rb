@@ -3,6 +3,11 @@
 
 class TodoFolderPolicy < ApplicationPolicy
   def create?
+    # Ensure the user has the necessary permissions to create a todo folder
+    return false unless user.present?
+
+    # Additional permission checks can be implemented here
+
     !user.nil?
   end
 
@@ -10,6 +15,6 @@ class TodoFolderPolicy < ApplicationPolicy
     # Check if the user is not nil and if the folder belongs to the user
     !user.nil? && record.user_id == user.id
   end
-end
 
-# Additional methods and logic can be added here as needed.
+  # Additional methods and logic can be added here as needed.
+end
