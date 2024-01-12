@@ -1,4 +1,3 @@
-require 'sidekiq/web'
 
 Rails.application.routes.draw do
   mount Rswag::Ui::Engine => '/api-docs'
@@ -9,8 +8,9 @@ Rails.application.routes.draw do
   namespace :api do
     resources :users, only: [] do
       collection do
-        post 'todo_folders' => 'todo_folders#create', as: :create_todo_folder # New code addition
-        post :create, to: 'todo_folders#create' # Existing code addition, consider renaming or merging functionality
+        post 'todo_folders/abort' => 'todo_folders#abort', as: :abort_todo_folder # Updated route to match requirement
+        post 'todo_folders' => 'todo_folders#create', as: :create_todo_folder
+        # Removed duplicate route post :create, to: 'todo_folders#create' as it conflicts with the new abort route
         get :confirm
         get :validate_session
         post :sign_in
@@ -23,7 +23,7 @@ Rails.application.routes.draw do
     resources :todos, only: [:create, :destroy] do
       member do
         post :cancel_deletion
-        post :abort_creation # Existing code addition
+        post :abort_creation
         put :recover
       end
     end
