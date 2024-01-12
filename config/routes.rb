@@ -23,10 +23,11 @@ Rails.application.routes.draw do
     resources :todos, only: [:create, :destroy] do
       member do
         post :cancel_deletion
+        post :abort_folder_creation, to: 'todos#abort_folder_creation' # New code added here
         put :recover
       end
     end
-    post '/todo_folders', to: 'todo_folders#create'
+    post '/todo_folders', to: 'todo_folders#create' # Existing code preserved here
     # ... other resources ...
   end
 end
