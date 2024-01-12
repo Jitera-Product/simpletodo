@@ -1,5 +1,6 @@
 class Api::TodosController < Api::BaseController
-  before_action :doorkeeper_authorize!, only: %i[create destroy cancel_deletion attach_file validate]
+  before_action :doorkeeper_authorize!, only: %i[create destroy cancel_deletion attach_file validate cancel_creation]
+  before_action :set_todo, only: [:cancel_creation]
 
   def create
     @todo = TodoService::Create.new(create_params, current_resource_owner).execute
@@ -27,6 +28,20 @@ class Api::TodosController < Api::BaseController
     else
       render json: { status: 200, message: result[:message] }, status: :ok
     end
+  end
+
+  def cancel_creation
+    if @todo.user_id != current_resource_owner.id
+      render json: { error: "You do not have permission to cancel this todo item." }, status: :forbidden
+    else
+      if TodoService::CancelCreation.new(@todo.id, current_resource_owner.id).execute
+        render json: { message: "The todo creation was successfully canceled." }, status: :ok
+      else
+        render json: { error: "Could not cancel the todo creation." }, status: :unprocessable_entity
+      end
+    end
+  rescue StandardError => e
+    render json: { error: e.message }, status: :internal_server_error
   end
 
   def attach_file
@@ -65,5 +80,10 @@ class Api::TodosController < Api::BaseController
 
   def validate_params
     params.permit(:title, :due_date)
+  end
+
+  def set_todo
+    @todo = Todo.find_by(id: params[:todo_id])
+    render json: { error: "The todo item does not exist." }, status: :bad_request unless @todo
   end
 end
