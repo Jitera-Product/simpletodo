@@ -1,11 +1,11 @@
 class Api::UsersController < Api::BaseController
-  before_action :doorkeeper_authorize!, except: [:register], unless: -> { action_name == 'validate_session' }
+  before_action :doorkeeper_authorize!, only: %i[create update_profile destroy update_shop], unless: -> { action_name == 'confirm' }
   before_action :authenticate_user, only: [:update_profile, :update_shop]
   before_action :authorize_user, only: [:update_profile, :update_shop]
 
   def register
     user_params = params.require(:user).permit(:name, :email, :password)
-    result = UserService::Register.execute(user_params)
+    result = execute_register(user_params)
 
     if result[:status] == :success
       render json: { message: result[:message] }, status: :ok
@@ -17,7 +17,22 @@ class Api::UsersController < Api::BaseController
   end
 
   def confirm
-    # ... existing confirm action ...
+    confirmation_token = params[:confirmation_token]
+    confirm_service = EmailConfirmationService::Confirm.new(confirmation_token)
+    begin
+      result = confirm_service.execute
+      if result[:success]
+        render json: { status: 200, message: result[:success] }, status: :ok
+      else
+        render json: { error: result[:error] }, status: :unprocessable_entity
+      end
+    rescue StandardError => e
+      render json: { error: e.message }, status: case e
+                                                  when ActiveRecord::RecordNotFound then :not_found
+                                                  when ActiveRecord::RecordInvalid then :unprocessable_entity
+                                                  else :bad_request
+                                                  end
+    end
   end
 
   def validate_session
@@ -75,6 +90,22 @@ class Api::UsersController < Api::BaseController
 
   def user_params
     params.require(:user).permit(:name, :email)
+  end
+
+  def execute_register(user_params)
+    # ... existing execute_register method ...
+  end
+
+  def execute(token)
+    # ... existing execute method ...
+  end
+
+  def execute_resend_confirmation(email)
+    # ... existing execute_resend_confirmation method ...
+  end
+
+  def shop_params
+    # ... existing shop_params method ...
   end
 
   # Existing authenticate_user and authorize_user methods will be implemented here

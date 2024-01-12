@@ -6,8 +6,16 @@ class EmailConfirmationService::Confirm
   end
   def execute
     email_confirmation = EmailConfirmation.find_by(token: token)
-    return { error: 'Invalid token' } unless email_confirmation
+    unless email_confirmation
+      raise 'Invalid token'
+    end
+
+    if Time.current > email_confirmation.expires_at
+      raise 'Token has expired'
+    end
+
     user = User.find(email_confirmation.user_id)
+    raise 'User not found' unless user
     user.update(email_confirmed: true)
     email_confirmation.destroy
     { success: 'Email confirmed successfully' }
