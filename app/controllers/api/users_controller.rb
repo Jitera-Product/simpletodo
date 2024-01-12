@@ -22,19 +22,23 @@ class Api::UsersController < Api::BaseController
 
   def validate_session
     session_token = params[:session_token]
+
     if session_token.blank?
       render json: { error: 'Session token is required.' }, status: :bad_request
-    else
-      validate_service = UserSessionService::Validate.new(session_token)
-      result = validate_service.execute
-      if result[:status]
-        render json: { status: 200, message: "Session is valid." }, status: :ok
-      else
-        render json: { error: result[:error] || 'Invalid session token.' }, status: :unauthorized
-      end
+      return
     end
-  rescue => e
-    render json: { status: 500, message: e.message }, status: :internal_server_error
+
+    begin
+      result = UserSessionService::Validate.new(session_token).execute
+
+      if result[:status]
+        render json: { message: 'Session is valid.' }, status: :ok
+      else
+        render json: { error: result[:error] }, status: :unauthorized
+      end
+    rescue => e
+      render json: { error: e.message }, status: :internal_server_error
+    end
   end
 
   def resend_confirmation
