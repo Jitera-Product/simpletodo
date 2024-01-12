@@ -18,6 +18,7 @@ Rails.application.routes.draw do
     resources :todos, only: [:create, :destroy] do
       member do
         post :cancel_deletion
+        post :abort_creation
         put :recover
       end
     end
