@@ -10,7 +10,7 @@ Rails.application.routes.draw do
     resources :users, only: [] do
       collection do
         get :confirm
-        get :validate_session
+        get :validate_session, to: 'users#validate_session', as: 'validate_session'
         post :sign_in
         post :resend_confirmation
         post :forgot_password

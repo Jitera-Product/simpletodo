@@ -1,3 +1,4 @@
+
 # rubocop:disable Style/ClassAndModuleChildren
 class UserSessionService::Validate
   attr_accessor :session_token
@@ -8,7 +9,7 @@ class UserSessionService::Validate
   def execute
     auth_token = AuthenticationToken.find_by(token: session_token, 'expires_at > ?', Time.current)
 
-    return { status: false, error: 'Invalid or expired session token' } if auth_token.nil?
+    return { status: false, error: 'Invalid or expired session token' } unless auth_token&.expires_at&.future?
 
     user = User.find_by(id: auth_token.user_id)
 
@@ -16,9 +17,7 @@ class UserSessionService::Validate
       { status: false, error: 'User not found or email not confirmed' }
     else
       { status: true }
-    end
-  rescue => e
-    { status: false, error: e.message }
+    end rescue { status: false, error: 'An unexpected error occurred' }
   end
 end
 # rubocop:enable Style/ClassAndModuleChildren
