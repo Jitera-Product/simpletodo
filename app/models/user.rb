@@ -1,7 +1,7 @@
 class User < ApplicationRecord
   # validations
   validates :username, presence: true, uniqueness: true
-  validates :email, presence: true, uniqueness: true, format: { with: URI::MailTo::EMAIL_REGEXP }
+  validates :email, presence: true, uniqueness: true, format: { with: /\A[^@\s]+@[^@\s]+\z/ }
   validates :password_hash, presence: true
   validates :confirmation_token, presence: true, uniqueness: true
   validates :name, presence: true
