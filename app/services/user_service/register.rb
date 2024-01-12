@@ -1,4 +1,3 @@
-
 # rubocop:disable Style/ClassAndModuleChildren
 class UserService::Register
   attr_accessor :user_params
@@ -8,9 +7,17 @@ class UserService::Register
   end
 
   def execute
-    return { error: I18n.t('activerecord.errors.messages.blank') } if user_params[:name].blank? || user_params[:email].blank?
+    return { error: 'Name is required.', status: :bad_request } if user_params[:name].blank?
+    return { error: 'A valid email is required.', status: :bad_request } unless validate_email
+    return { error: 'Password must be at least 8 characters long.', status: :bad_request } unless validate_password
+
     existing_user = User.find_by(email: user_params[:email])
-    return { error: I18n.t('activerecord.errors.messages.taken') } if existing_user
+    if existing_user
+      return {
+        error: 'A user with the given email already exists.',
+        status: :conflict
+      }
+    end
 
     hashed_password = BCrypt::Password.create(user_params[:password])
     confirmation_token = SecureRandom.hex(10)
@@ -27,35 +34,22 @@ class UserService::Register
 
     if user.save
       UserService::SendConfirmationEmail.new(user.email, user.confirmation_token).execute
-      { success: 'User registered successfully. Confirmation email sent.' }
+      { status: 201, message: 'User registered successfully.' }
     else
-      { error: user.errors.full_messages.join(', ') }
+      { error: user.errors.full_messages.join(', '), status: :internal_server_error }
     end
   end
 
   private
 
   def validate_email
-    UserService::ValidateEmail.new(user_params[:email]).execute
+    email = user_params[:email]
+    email.present? && email.match(/\A[\w+\-.]+@[a-z\d\-.]+\.[a-z]+\z/i)
   end
 
   def validate_password
-    UserService::ValidatePassword.new(user_params[:password], user_params[:password_confirmation]).execute
-  end
-
-  def store_user
-    UserService::StoreUser.new(user_params).execute
-  end
-
-  def generate_confirmation_token
-    user = User.find_by(email: user_params[:email])
-    UserService::GenerateConfirmationToken.new(user.id).execute
-  end
-
-  def send_confirmation_email
-    user = User.find_by(email: user_params[:email])
-    token = EmailConfirmation.find_by(user_id: user.id).token
-    UserService::SendConfirmationEmail.new(user.email, token).execute
+    password = user_params[:password]
+    password.present? && password.length >= 8
   end
 end
 # rubocop:enable Style/ClassAndModuleChildren

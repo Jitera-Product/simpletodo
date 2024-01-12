@@ -2,13 +2,19 @@ class Api::UsersController < Api::BaseController
   before_action :doorkeeper_authorize!, only: %i[create update_profile destroy update_shop], unless: -> { action_name == 'validate_session' }
   before_action :authenticate_user, only: [:update_profile, :update_shop, :confirm_email]
   before_action :authorize_user, only: [:update_profile, :update_shop]
+  before_action :validate_register_params, only: [:register]
 
   def register
     user_params = params.require(:user).permit(:name, :email, :password)
+    # Check if a user with the given email already exists
+    if User.exists?(email: user_params[:email])
+      return render json: { error: 'A user with the given email already exists.' }, status: :conflict
+    end
+
     result = UserService::Register.execute(user_params)
 
     if result[:status] == :success
-      render json: { message: result[:message] }, status: :ok
+      render json: { message: result[:message] }, status: :created
     else
       render json: { error: result[:error] }, status: result[:status]
     end
@@ -117,6 +123,26 @@ class Api::UsersController < Api::BaseController
 
   def user_params
     params.require(:user).permit(:name, :email)
+  end
+
+  def validate_register_params
+    required_params = %i[name email password]
+    missing_params = required_params.select { |param| params[:user][param].blank? }
+    missing_params.each do |param|
+      case param
+      when :name
+        render json: { error: "Name is required." }, status: :bad_request and return
+      when :email
+        unless params[:user][:email].match?(/\A[^@\s]+@[^@\s]+\z/)
+          render json: { error: "A valid email is required." }, status: :bad_request and return
+        end
+      when :password
+        if params[:user][:password].length < 8
+          render json: { error: "Password must be at least 8 characters long." }, status: :bad_request and return
+        end
+      end
+    end
+    true
   end
 
   # Existing authenticate_user and authorize_user methods will be implemented here
