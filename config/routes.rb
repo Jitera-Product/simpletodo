@@ -1,3 +1,4 @@
+require 'sidekiq/web'
 
 Rails.application.routes.draw do
   mount Rswag::Ui::Engine => '/api-docs'
@@ -25,7 +26,7 @@ Rails.application.routes.draw do
       end
     end
     resources :folders, only: [:create] do # Keep the restriction to only the :create action
-      post :notifications, to: 'notifications#create' # This line is redundant and should be removed as it's already defined under users collection
+      # Removed the redundant post :notifications, to: 'notifications#create' line as it's already defined under users collection
       member do
         post :cancel_creation
         post :cancel, to: 'folders#cancel' # Keep the added line from the existing code
@@ -33,5 +34,7 @@ Rails.application.routes.draw do
     end
     post 'folders/validation-errors', to: 'folders#validation_errors' # New line from the new code
     get 'folders/check_name_uniqueness', to: 'folders#check_name_uniqueness' # Keep this line from both versions
+    # The following line is added to meet the requirement for creating a custom folder
+    post 'folders/custom', to: 'folders#create_custom' # This is the endpoint for creating a custom folder
   end
 end
