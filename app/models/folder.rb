@@ -1,3 +1,4 @@
+
 class Folder < ApplicationRecord
   # validations
   validates_presence_of :name, :color, :icon, :user_id

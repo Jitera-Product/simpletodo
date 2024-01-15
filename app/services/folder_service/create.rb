@@ -32,7 +32,7 @@ module FolderService
     private
 
     def unique_name_for_user
-      errors.add(:name, "A folder with this name already exists.") if Folder.name_unique_for_user?(@name, @user_id)
+      errors.add(:name, "A folder with this name already exists.") unless Folder.name_unique_for_user?(@name, @user_id)
     end
 
     def valid_color_format
