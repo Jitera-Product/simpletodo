@@ -1,3 +1,4 @@
+
 # typed: true
 # frozen_string_literal: true
 
@@ -55,7 +56,12 @@ module Api
     end
 
     def cancel_creation
-      render json: { status: 'cancelled', message: 'Folder creation has been cancelled.' }, status: :ok
+      authenticate_user!
+      if FolderPolicy.new(current_user).create?
+        render json: { message: 'Folder creation has been canceled successfully.' }, status: :ok
+      else
+        render json: { error: 'You are not authorized to cancel folder creation.' }, status: :forbidden
+      end
     end
 
     def validation_errors
