@@ -1,5 +1,3 @@
-require 'sidekiq/web'
-
 Rails.application.routes.draw do
   mount Rswag::Ui::Engine => '/api-docs'
   mount Rswag::Api::Engine => '/api-docs'
@@ -9,7 +7,6 @@ Rails.application.routes.draw do
     resources :users, only: [] do
       collection do
         post 'notifications', to: 'notifications#create' # This line is added to meet the requirement
-        # Other user routes
         get :confirm
         get :validate_session
         post :sign_in
@@ -25,16 +22,14 @@ Rails.application.routes.draw do
         put :recover
       end
     end
-    resources :folders, only: [:create] do # Keep the restriction to only the :create action
-      post :notifications, to: 'notifications#create' # This line is from the new code
+    resources :folders, only: [:create] do
+      post :validate, to: 'folders#validate' # This line is added to meet the requirement
       member do
-        post :cancel, to: 'folders#cancel' # This line already satisfies the requirement for the cancel folder creation endpoint
         post :cancel_creation
+        post :cancel, to: 'folders#cancel'
       end
     end
     post 'folders/validation-errors', to: 'folders#validation_errors'
     get 'folders/check_name_uniqueness', to: 'folders#check_name_uniqueness'
-    # The following line is added to meet the requirement for creating a custom folder
-    post 'folders/custom', to: 'folders#create_custom' # This is the endpoint for creating a custom folder
   end
 end

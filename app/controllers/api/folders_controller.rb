@@ -3,7 +3,7 @@
 
 module Api
   class FoldersController < BaseController
-    before_action :authenticate_user!, only: [:create, :cancel_creation]
+    before_action :authenticate_user!, only: [:create, :validate]
 
     def create
       validation_result = UserSessionService::Validate.new(request.headers['Authorization']).execute
@@ -35,7 +35,7 @@ module Api
           folder_service = FolderService::Create.new(user_id, params[:name], params[:color], params[:icon])
           folder = folder_service.call
           if folder.persisted?
-            render json: { folder_id: folder.id, name: folder.name, color: folder.color, icon: folder.icon, user_id: user_id, created_at: folder.created_at, updated_at: folder.updated_at }, status: :created
+            render json: { folder_id: folder.id, name: folder.name, color: folder.color, icon: folder.icon, created_at: folder.created_at, updated_at: folder.updated_at }, status: :created
           else
             render json: { errors: folder.errors.full_messages }, status: :unprocessable_entity
           end
@@ -47,25 +47,28 @@ module Api
       end
     end
 
-    def cancel_creation
+    def validate
       validation_result = UserSessionService::Validate.new(request.headers['Authorization']).execute
       if validation_result[:status]
-        user = validation_result[:user]
-        if FolderPolicy.new(user).create?
-          render json: { status: 200, message: 'Folder creation process has been canceled successfully.' }, status: :ok
-        else
-          render json: { error: 'User does not have permission to cancel folder creation.' }, status: :forbidden
+        user_id = validation_result[:user].id
+
+        if params[:name].blank?
+          render json: { error: 'The folder name is required.' }, status: :bad_request
+          return
         end
+
+        unless Folder.name_unique_for_user?(params[:name], user_id)
+          render json: { error: 'A folder with this name already exists.' }, status: :conflict
+          return
+        end
+
+        render json: { status: 200, valid: true }, status: :ok
       else
         render json: { error: 'User is not authenticated.' }, status: :unauthorized
       end
     end
 
-    # ... rest of the existing methods ...
-
     private
-
-    # ... existing private methods ...
 
     def valid_color_format?(color)
       color.match?(/\A#(?:[0-9a-fA-F]{3}){1,2}\z/)
