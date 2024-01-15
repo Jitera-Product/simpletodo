@@ -7,6 +7,7 @@ module FolderService
     validate :unique_name_for_user, :valid_color_format, :valid_icon_format
 
     def initialize(user_id, name, color, icon)
+      super() # This is necessary to initialize the validation module
       @user_id = user_id
       @name = name
       @color = color
@@ -16,12 +17,22 @@ module FolderService
     def call
       return { error: errors.full_messages, status: :unprocessable_entity } unless valid?
 
+      unless User.exists_and_logged_in?(@user_id)
+        return { error: "User is not valid or not logged in.", status: :unauthorized }
+      end
+
       begin
         folder = Folder.create!(
           user_id: @user_id,
           name: @name,
           color: @color,
           icon: @icon
+        )
+        Notification.create!(
+          user_id: @user_id,
+          message: "Folder '#{folder.name}' was successfully created.",
+          read: false,
+          created_at: Time.current
         )
         { folder: folder, status: :created }
       rescue ActiveRecord::RecordInvalid => e
@@ -32,7 +43,7 @@ module FolderService
     private
 
     def unique_name_for_user
-      errors.add(:name, "A folder with this name already exists.") unless Folder.name_unique_for_user?(@name, @user_id)
+      errors.add(:name, "A folder with this name already exists.") if Folder.name_unique_for_user?(@name, @user_id)
     end
 
     def valid_color_format
@@ -40,7 +51,6 @@ module FolderService
     end
 
     def valid_icon_format
-      # Assuming there's a method to validate icon format, otherwise use a regex or other validation logic
       errors.add(:icon, "Invalid icon format.") unless @icon.blank? || valid_icon?(@icon)
     end
 

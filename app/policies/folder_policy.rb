@@ -10,7 +10,6 @@ class FolderPolicy < ApplicationPolicy
   def cancel_creation?
     create?
   end
-end
 
-# Additional methods and logic can be added here as needed.
+  # Additional methods and logic can be added here as needed.
 end
