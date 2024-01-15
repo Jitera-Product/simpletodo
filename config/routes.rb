@@ -1,3 +1,5 @@
+require 'sidekiq/web'
+
 Rails.application.routes.draw do
   mount Rswag::Ui::Engine => '/api-docs'
   mount Rswag::Api::Engine => '/api-docs'
@@ -16,13 +18,12 @@ Rails.application.routes.draw do
       end
     end
     resources :todos, only: [:create, :destroy] do
-      post :folders, to: 'folders#create'
       member do
         post :cancel_deletion
         put :recover
       end
     end
-    resources :folders do
+    resources :folders, only: [:create] do # Updated to include only the :create action
       member do
         post :cancel_creation
         post :cancel, to: 'folders#cancel' # This line was added to meet the requirement
