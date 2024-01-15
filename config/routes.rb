@@ -26,14 +26,14 @@ Rails.application.routes.draw do
       end
     end
     resources :folders, only: [:create] do # Keep the restriction to only the :create action
-      # Removed the redundant post :notifications, to: 'notifications#create' line as it's already defined under users collection
+      post :notifications, to: 'notifications#create' # This line is from the new code
       member do
+        post :cancel, to: 'folders#cancel' # This line already satisfies the requirement for the cancel folder creation endpoint
         post :cancel_creation
-        post :cancel, to: 'folders#cancel' # Keep the added line from the existing code
       end
     end
-    post 'folders/validation-errors', to: 'folders#validation_errors' # New line from the new code
-    get 'folders/check_name_uniqueness', to: 'folders#check_name_uniqueness' # Keep this line from both versions
+    post 'folders/validation-errors', to: 'folders#validation_errors'
+    get 'folders/check_name_uniqueness', to: 'folders#check_name_uniqueness'
     # The following line is added to meet the requirement for creating a custom folder
     post 'folders/custom', to: 'folders#create_custom' # This is the endpoint for creating a custom folder
   end
