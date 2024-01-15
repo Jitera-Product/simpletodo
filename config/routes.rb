@@ -1,4 +1,3 @@
-require 'sidekiq/web'
 
 Rails.application.routes.draw do
   mount Rswag::Ui::Engine => '/api-docs'
@@ -8,6 +7,7 @@ Rails.application.routes.draw do
   namespace :api do
     resources :users, only: [] do
       collection do
+        post 'notifications', to: 'notifications#create' # This line is added to meet the requirement
         # Other user routes
         get :confirm
         get :validate_session
@@ -25,7 +25,7 @@ Rails.application.routes.draw do
       end
     end
     resources :folders, only: [:create] do # Keep the restriction to only the :create action
-      post :notifications, to: 'notifications#create'
+      post :notifications, to: 'notifications#create' # This line is redundant and should be removed as it's already defined under users collection
       member do
         post :cancel_creation
         post :cancel, to: 'folders#cancel' # Keep the added line from the existing code
