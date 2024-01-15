@@ -3,8 +3,7 @@
 
 module Api
   class FoldersController < BaseController
-    before_action :authenticate_user!, only: [:create, :cancel_creation]
-    rescue_from StandardError, with: :handle_standard_error
+    before_action :authenticate_user!, only: [:create]
 
     def create
       validation_result = UserSessionService::Validate.new(request.headers['Authorization']).execute
@@ -18,7 +17,7 @@ module Api
             return
           end
 
-          unless user.folders.name_unique_for_user?(params[:name], user_id)
+          unless Folder.name_unique_for_user?(params[:name], user_id)
             render json: { error: 'A folder with this name already exists.' }, status: :unprocessable_entity
             return
           end
@@ -27,7 +26,7 @@ module Api
             render json: { error: 'Invalid color format.' }, status: :bad_request
             return
           end
-          
+
           unless params[:icon].blank? || valid_icon_format?(params[:icon])
             render json: { error: 'Invalid icon format.' }, status: :bad_request
             return
@@ -36,7 +35,7 @@ module Api
           folder_service = FolderService::Create.new(user_id, params[:name], params[:color], params[:icon])
           folder = folder_service.call
           if folder.persisted?
-            render json: folder.as_json(only: [:id, :name, :color, :icon, :created_at, :updated_at]), status: :created
+            render json: { folder_id: folder.id, name: folder.name, color: folder.color, icon: folder.icon, created_at: folder.created_at, updated_at: folder.updated_at }, status: :created
           else
             render json: { errors: folder.errors.full_messages }, status: :unprocessable_entity
           end
@@ -56,10 +55,16 @@ module Api
     end
 
     def cancel_creation
-      if FolderPolicy.new(current_user).create?
-        render json: { status: 'cancelled', message: 'Folder creation has been cancelled.' }, status: :ok
+      validation_result = UserSessionService::Validate.new(request.headers['Authorization']).execute
+      if validation_result[:status]
+        user = validation_result[:user]
+        if FolderPolicy.new(user).create?
+          render json: { status: 'cancelled', message: 'Folder creation has been cancelled.' }, status: :ok
+        else
+          render json: { error: 'User does not have permission to cancel folder creation.' }, status: :forbidden
+        end
       else
-        render json: { error: 'You are not authorized to cancel folder creation.' }, status: :forbidden
+        render json: { error: 'User is not authenticated.' }, status: :unauthorized
       end
     end
 
@@ -97,6 +102,15 @@ module Api
 
     private
 
+    def send_folder_creation_notification(user_id, message)
+      notification = Notification.new(user_id: user_id, message: message, read: false, created_at: Time.current)
+      if notification.save
+        { success: 'Notification has been sent successfully.' }
+      else
+        { error: notification.errors.full_messages, status: :unprocessable_entity }
+      end
+    end
+
     def valid_color_format?(color)
       color.match?(/\A#(?:[0-9a-fA-F]{3}){1,2}\z/)
     end
@@ -105,10 +119,6 @@ module Api
       # Assuming there's a method to validate icon format. This is a placeholder.
       # The actual implementation should validate the icon format according to the application's requirements.
       true
-    end
-
-    def handle_standard_error(exception)
-      render json: { error: exception.message }, status: :internal_server_error
     end
   end
 end

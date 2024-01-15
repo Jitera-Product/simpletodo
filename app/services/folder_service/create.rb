@@ -28,15 +28,12 @@ module FolderService
           color: @color,
           icon: @icon
         )
-        Notification.create!(
-          user_id: @user_id,
-          message: "Folder '#{folder.name}' was successfully created.",
-          read: false,
-          created_at: Time.current
-        )
         { folder: folder, status: :created }
       rescue ActiveRecord::RecordInvalid => e
         { error: e.message, status: :unprocessable_entity }
+      ensure
+        # The notification creation logic has been moved to the ensure block to handle both successful and unsuccessful folder creation attempts.
+        send_folder_creation_notification(@user_id, "Folder '#{folder.name}' was successfully created.") if folder&.persisted?
       end
     end
 
@@ -57,6 +54,14 @@ module FolderService
     def valid_icon?(icon)
       # Placeholder for icon format validation logic
       true
+    end
+
+    def send_folder_creation_notification(user_id, message)
+      # The notification creation logic has been updated to use the NotificationService::Create service.
+      notification_service = NotificationService::Create.new
+      notification_service.create(user_id: user_id, message: message)
+    rescue StandardError => e
+      Rails.logger.error "Failed to send folder creation notification: #{e.message}"
     end
   end
 end

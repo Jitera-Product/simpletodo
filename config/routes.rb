@@ -25,6 +25,7 @@ Rails.application.routes.draw do
       end
     end
     resources :folders, only: [:create] do # Keep the restriction to only the :create action
+      post :notifications, to: 'notifications#create'
       member do
         post :cancel_creation
         post :cancel, to: 'folders#cancel' # Keep the added line from the existing code

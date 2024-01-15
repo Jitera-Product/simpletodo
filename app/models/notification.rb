@@ -1,4 +1,3 @@
-
 class Notification < ApplicationRecord
   # validations
   validates_presence_of :message, :user_id
