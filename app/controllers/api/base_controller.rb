@@ -44,6 +44,14 @@ module Api
       render json: { message: I18n.t('common.errors.record_not_uniq_error') }, status: :forbidden
     end
 
+    def base_render_folder_validation_error(validation_errors)
+      render json: {
+        is_valid: false,
+        validation_errors: validation_errors
+      }, status: :unprocessable_entity
+    end
+
+
     def custom_token_initialize_values(resource, client)
       token = CustomAccessToken.create(
         application_id: client.id,
