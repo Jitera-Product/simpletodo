@@ -25,5 +25,19 @@ module Api
     def cancel_creation
       render json: { status: 'cancelled', message: 'Folder creation has been cancelled.' }, status: :ok
     end
+
+    def cancel
+      validation_result = UserSessionService::Validate.new(request.headers['Authorization']).execute
+      if validation_result[:status]
+        user = validation_result[:user]
+        if FolderPolicy.new(user).create?
+          render json: { status: 200, message: 'Folder creation process has been canceled.' }, status: :ok
+        else
+          render json: { error: 'User does not have permission to cancel folder creation.' }, status: :forbidden
+        end
+      else
+        render json: { error: 'User is not authenticated.' }, status: :unauthorized
+      end
+    end
   end
 end
