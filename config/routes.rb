@@ -28,5 +28,6 @@ Rails.application.routes.draw do
         post :cancel_creation
       end
     end
+    get 'folders/check_name_uniqueness', to: 'folders#check_name_uniqueness'
   end
 end
