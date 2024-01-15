@@ -13,8 +13,12 @@ class User < ApplicationRecord
   has_many :password_reset_tokens, dependent: :destroy
   has_many :todos, dependent: :destroy
   has_many :folders, dependent: :destroy
+  has_many :notifications, dependent: :destroy # Added new relationship
   # end for relationships
 
+  # Add any additional model-specific logic here
+
   class << self
+    # Add class methods here
   end
 end
