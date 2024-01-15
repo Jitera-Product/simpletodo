@@ -6,36 +6,44 @@ module Api
     before_action :authenticate_user!, only: [:create]
 
     def create
-      if FolderPolicy.new(current_user).create?
-        if params[:name].blank?
-          render json: { error: 'The folder name is required.' }, status: :bad_request
-          return
-        end
+      validation_result = UserSessionService::Validate.new(request.headers['Authorization']).execute
+      if validation_result[:status]
+        user_id = validation_result[:user].id
+        user = validation_result[:user]
 
-        unless Folder.name_unique_for_user?(current_user.id, params[:name])
-          render json: { error: 'A folder with this name already exists.' }, status: :unprocessable_entity
-          return
-        end
+        if FolderPolicy.new(user).create?
+          if params[:name].blank?
+            render json: { error: 'The folder name is required.' }, status: :bad_request
+            return
+          end
 
-        unless params[:color].blank? || valid_color_format?(params[:color])
-          render json: { error: 'Invalid color format.' }, status: :bad_request
-          return
-        end
+          unless Folder.name_unique_for_user?(params[:name], user_id)
+            render json: { error: 'A folder with this name already exists.' }, status: :unprocessable_entity
+            return
+          end
 
-        unless params[:icon].blank? || valid_icon_format?(params[:icon])
-          render json: { error: 'Invalid icon format.' }, status: :bad_request
-          return
-        end
+          unless params[:color].blank? || valid_color_format?(params[:color])
+            render json: { error: 'Invalid color format.' }, status: :bad_request
+            return
+          end
 
-        folder_service = FolderService::Create.new(current_user.id, params[:name], params[:color], params[:icon])
-        folder = folder_service.call
-        if folder.persisted?
-          render json: { status: 201, folder: folder.as_json }, status: :created
+          unless params[:icon].blank? || valid_icon_format?(params[:icon])
+            render json: { error: 'Invalid icon format.' }, status: :bad_request
+            return
+          end
+
+          folder_service = FolderService::Create.new(user_id, params[:name], params[:color], params[:icon])
+          folder = folder_service.call
+          if folder.persisted?
+            render json: { folder_id: folder.id, name: folder.name, color: folder.color, icon: folder.icon, created_at: folder.created_at, updated_at: folder.updated_at }, status: :created
+          else
+            render json: { errors: folder.errors.full_messages }, status: :unprocessable_entity
+          end
         else
-          render json: { errors: folder.errors.full_messages }, status: :unprocessable_entity
+          render json: { error: 'You are not authorized to create folders.' }, status: :forbidden
         end
       else
-        render json: { error: 'You are not authorized to create folders.' }, status: :forbidden
+        render json: { error: validation_result[:error] }, status: :unauthorized
       end
     end
 
@@ -48,6 +56,24 @@ module Api
 
     def cancel_creation
       render json: { status: 'cancelled', message: 'Folder creation has been cancelled.' }, status: :ok
+    end
+
+    def validation_errors
+      validation_result = UserSessionService::Validate.new(request.headers['Authorization']).execute
+      if validation_result[:status]
+        user = validation_result[:user]
+        unless FolderPolicy.new(user).create?
+          return render json: { error: 'Forbidden' }, status: :forbidden
+        end
+        error_message = params[:error_message]
+        if error_message.blank?
+          render json: { error: 'Error message is required.' }, status: :bad_request
+        else
+          render json: { status: 200, message: 'The folder name is already in use. Please choose a different name.' }, status: :ok
+        end
+      else
+        render json: { error: validation_result[:error] }, status: :unauthorized
+      end
     end
 
     def cancel

@@ -18,17 +18,19 @@ Rails.application.routes.draw do
       end
     end
     resources :todos, only: [:create, :destroy] do
+      post :folders, to: 'folders#create'
       member do
         post :cancel_deletion
         put :recover
       end
     end
-    resources :folders, only: [:create] do # Updated to include only the :create action
+    resources :folders, only: [:create] do # Keep the restriction to only the :create action
       member do
         post :cancel_creation
-        post :cancel, to: 'folders#cancel' # This line was added to meet the requirement
+        post :cancel, to: 'folders#cancel' # Keep the added line from the existing code
       end
     end
-    get 'folders/check_name_uniqueness', to: 'folders#check_name_uniqueness'
+    post 'folders/validation-errors', to: 'folders#validation_errors' # New line from the new code
+    get 'folders/check_name_uniqueness', to: 'folders#check_name_uniqueness' # Keep this line from both versions
   end
 end
