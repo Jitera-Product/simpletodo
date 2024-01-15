@@ -1,3 +1,4 @@
+
 require 'sidekiq/web'
 Rails.application.routes.draw do
   mount Rswag::Ui::Engine => '/api-docs'
@@ -7,6 +8,7 @@ Rails.application.routes.draw do
   namespace :api do
     resources :users, only: [] do
       collection do
+        # Other user routes
         get :confirm
         get :validate_session
         post :sign_in
@@ -19,6 +21,11 @@ Rails.application.routes.draw do
       member do
         post :cancel_deletion
         put :recover
+      end
+    end
+    resources :folders do
+      member do
+        post :cancel_creation
       end
     end
   end
