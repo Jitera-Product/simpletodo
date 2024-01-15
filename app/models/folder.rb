@@ -10,5 +10,8 @@ class Folder < ApplicationRecord
   # end for relationships
 
   class << self
+    def name_unique_for_user?(name, user_id)
+      !exists?(name: name, user_id: user_id)
+    end
   end
 end

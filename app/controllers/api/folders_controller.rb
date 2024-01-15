@@ -1,6 +1,20 @@
-
 module Api
   class FoldersController < BaseController
+    def create
+      validation_result = UserSessionService::Validate.new(request.headers['Authorization']).execute
+      if validation_result[:status]
+        user_id = validation_result[:user].id
+        if Folder.name_unique_for_user?(params[:name], user_id)
+          folder = FolderService::Create.new.call(user_id, params[:name], params[:color], params[:icon])
+          render json: { folder_id: folder.id, name: folder.name, color: folder.color, icon: folder.icon, created_at: folder.created_at, updated_at: folder.updated_at }, status: :created
+        else
+          render json: { error: 'Folder name already exists' }, status: :unprocessable_entity
+        end
+      else
+        render json: { error: validation_result[:error] }, status: :unauthorized
+      end
+    end
+
     def check_name_uniqueness
       user_id = params[:user_id]
       name = params[:name]
