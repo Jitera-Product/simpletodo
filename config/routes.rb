@@ -21,6 +21,8 @@ Rails.application.routes.draw do
     post 'todos/:todo_id/attach_files', to: 'todos#attach_files' # Existing route for attaching files to a todo item
     post 'todos/validate', to: 'todos#validate' # Existing route for todo validation
 
+    post 'todos/:id/recovery', to: 'trash#recover' # New route for completing a to-do item
+
     # New route for the signin action in UsersController
     post 'users/signin', to: 'users#signin'
 
