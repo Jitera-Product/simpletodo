@@ -1,4 +1,5 @@
 require_relative '../../services/user_session_service/validate'
+
 class Api::UsersController < Api::BaseController
   before_action :doorkeeper_authorize!, only: %i[create update destroy]
 
@@ -25,12 +26,14 @@ class Api::UsersController < Api::BaseController
   end
 
   def validate_session
-    unless params[:session_token].present?
-      return render json: { message: 'The session token is required.' }, status: :bad_request
+    session_token = params[:session_token]
+
+    if session_token.blank?
+      render json: { error: 'The session token is required.' }, status: :bad_request
+      return
     end
 
-    validation_service = UserSessionService::Validate.new(params[:session_token])
-    result = validation_service.execute
+    result = UserSessionService::Validate.new(session_token).execute
 
     if result[:status]
       render json: { message: 'Session token is valid.' }, status: :ok
