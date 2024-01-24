@@ -1,4 +1,3 @@
-
 Rails.application.routes.draw do
   mount Rswag::Ui::Engine => '/api-docs'
   mount Rswag::Api::Engine => '/api-docs'
@@ -8,7 +7,7 @@ Rails.application.routes.draw do
   namespace :api do
     resources :users, only: [] do
       collection do
-        post 'login', to: 'users#login', as: :login # This line is added to meet the requirement
+        post 'login', to: 'users#login', as: :login # Existing code addition
         post :register
         post :resend_confirmation
         get :confirm
@@ -16,6 +15,7 @@ Rails.application.routes.draw do
         get :validate_session
         post :sign_in
         post :forgot_password
+        post 'request-password-reset', to: 'users#request_password_reset' # New code addition
         put :reset_password
       end
     end

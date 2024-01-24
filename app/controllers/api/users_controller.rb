@@ -26,6 +26,31 @@ class Api::UsersController < Api::BaseController
     end
   end
 
+  # ... existing actions ...
+
+  def request_password_reset
+    email = params[:email]
+    begin
+      email_validator = PasswordResetService::ValidateEmail.new(email)
+      unless email_validator.execute
+        render json: { status: 400, message: "Invalid email format." }, status: :bad_request
+        return
+      end
+
+      user = User.find_by_email(email)
+      unless user
+        render json: { status: 404, message: "Email does not exist." }, status: :not_found
+        return
+      end
+
+      token = user.generate_password_reset_token
+      UserMailer.reset_password_instructions(user, token).deliver_now
+      render json: { status: 200, message: "A password reset link has been sent to your email address." }, status: :ok
+    rescue => e
+      render json: { status: 500, message: e.message }, status: :internal_server_error
+    end
+  end
+
   # ... rest of the existing code ...
 
   private
