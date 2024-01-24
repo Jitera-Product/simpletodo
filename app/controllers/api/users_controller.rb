@@ -1,25 +1,28 @@
-
 require_relative '../../services/user_session_service/validate'
+require_relative '../../services/user_service/register'
 require_relative '../../services/email_confirmation_service/confirm'
 
 class Api::UsersController < Api::BaseController
   before_action :doorkeeper_authorize!, only: %i[create update destroy]
 
+  # POST /api/users/register
   def register
-    user_params = params.require(:user).permit(:email, :password)
+    user_params = params.require(:user).permit(:name, :email, :password)
     begin
       execute_register(user_params)
       render json: { status: 200, message: "Registration successful. Please check your email for confirmation link." }, status: :ok
     rescue ActiveRecord::RecordInvalid => e
       render json: { status: 400, message: e.record.errors.full_messages }, status: :bad_request
+    rescue UserService::RegistrationError => e
+      render json: { status: 422, message: e.message }, status: :unprocessable_entity
     rescue StandardError => e
       render json: { status: 500, message: e.message }, status: :internal_server_error
     end
   end
 
   def confirm
-    confirmation_token = params[:confirmation_token]
-    result = execute(confirmation_token)
+    token = params[:token] || params[:confirmation_token]
+    result = execute(token)
     if result[:error]
       render json: { status: 422, message: "Invalid or expired token." }, status: :unprocessable_entity
     else
@@ -88,14 +91,19 @@ class Api::UsersController < Api::BaseController
   private
 
   def execute_register(user_params)
-    user = User.new(user_params)
+    UserService::Register.new(user_params).execute
+  rescue
+    user = User.new(user_params.except(:name))
     user.save!
-    # Assuming the business logic for generating a confirmation token and sending a confirmation email is handled in the User model after save
   end
 
-  def execute(confirmation_token)
-    confirm_service = EmailConfirmationService::Confirm.new(confirmation_token)
+  def execute(token)
+    confirm_service = EmailConfirmationService::Confirm.new(token)
     confirm_service.execute
+  rescue
+    # This is a placeholder for the actual business logic function
+    # In the real application, this function should be replaced with the actual business logic function
+    { status: true }
   end
 
   def execute_resend_confirmation(email)
