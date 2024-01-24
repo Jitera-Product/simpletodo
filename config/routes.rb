@@ -1,4 +1,3 @@
-require 'sidekiq/web'
 
 Rails.application.routes.draw do
   mount Rswag::Ui::Engine => '/api-docs'
@@ -9,10 +8,11 @@ Rails.application.routes.draw do
   namespace :api do
     resources :users, only: [] do
       collection do
-        post :register # Existing code addition
+        post 'login', to: 'users#login', as: :login # This line is added to meet the requirement
+        post :register
         post :resend_confirmation
         get :confirm
-        get 'confirm/:confirmation_token', to: 'users#confirm', as: :confirm_email # Existing code addition
+        get 'confirm/:confirmation_token', to: 'users#confirm', as: :confirm_email
         get :validate_session
         post :sign_in
         post :forgot_password
