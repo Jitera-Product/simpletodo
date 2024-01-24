@@ -1,11 +1,12 @@
 require_relative '../../services/user_session_service/validate'
 require_relative '../../services/user_service/register'
 require_relative '../../services/email_confirmation_service/confirm'
+require_relative '../../services/password_reset_service/validate_email'
+require_relative '../../services/password_reset_service/validate_password'
 
 class Api::UsersController < Api::BaseController
   before_action :doorkeeper_authorize!, only: %i[create update destroy]
 
-  # POST /api/users/register
   def register
     user_params = params.require(:user).permit(:name, :email, :password)
     begin
@@ -61,37 +62,45 @@ class Api::UsersController < Api::BaseController
   end
 
   def reset_password
-    token = params[:token]
-    password = params[:password]
+    password_hash = params[:password_hash] || params[:password]
+    password_reset_token = params[:password_reset_token] || params[:token]
     password_confirmation = params[:password_confirmation]
-    # Validate token
-    user = User.find_by_reset_password_token(token)
-    unless user
-      render json: { status: 400, message: "Invalid token." }, status: :bad_request
-      return
-    end
-    # Validate password length
-    if password.length < 8
-      render json: { status: 400, message: "Password must be at least 8 characters." }, status: :bad_request
-      return
-    end
-    # Validate password confirmation
-    if password != password_confirmation
-      render json: { status: 400, message: "Password confirmation does not match." }, status: :bad_request
-      return
-    end
-    # Reset password
-    if user.reset_password(password, password_confirmation)
+    
+    begin
+      if password_reset_token
+        user = PasswordResetService::ValidateEmail.new.validate_token_and_email(password_reset_token, params[:email])
+        PasswordResetService::ValidatePassword.new.update_password_hash(user, password_hash)
+      else
+        user = User.find_by_reset_password_token(password_reset_token)
+        unless user
+          render json: { status: 400, message: "Invalid token." }, status: :bad_request
+          return
+        end
+        if password_hash.length < 8
+          render json: { status: 400, message: "Password must be at least 8 characters." }, status: :bad_request
+          return
+        end
+        if password_hash != password_confirmation
+          render json: { status: 400, message: "Password confirmation does not match." }, status: :bad_request
+          return
+        end
+        user.reset_password(password_hash, password_confirmation)
+      end
       render json: { status: 200, message: "Your password has been reset successfully." }, status: :ok
-    else
+    rescue => e
       render json: { status: 500, message: "An unexpected error occurred on the server." }, status: :internal_server_error
     end
   end
-
+  
   private
 
   def execute_register(user_params)
-    UserService::Register.new(user_params).execute
+    if user_params[:name]
+      UserService::Register.new(user_params).execute
+    else
+      user = User.new(user_params.except(:name))
+      user.save!
+    end
   rescue
     user = User.new(user_params.except(:name))
     user.save!

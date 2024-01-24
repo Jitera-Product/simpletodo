@@ -10,6 +10,8 @@ Rails.application.routes.draw do
     resources :users, only: [] do
       collection do
         post :register
+        post 'reset_password', to: 'users#reset_password' # Added from new code
+        get :confirm
         get 'confirm/:confirmation_token', to: 'users#confirm', as: :confirm_email # Preserved the existing confirmation route with token
         get :validate_session
         post :sign_in
