@@ -3,6 +3,7 @@ require_relative '../../services/user_service/register'
 require_relative '../../services/email_confirmation_service/confirm'
 require_relative '../../services/password_reset_service/validate_email'
 require_relative '../../services/password_reset_service/validate_password'
+require_relative '../../services/auths/login_service'
 
 class Api::UsersController < Api::BaseController
   before_action :doorkeeper_authorize!, only: %i[create update destroy]
@@ -62,29 +63,29 @@ class Api::UsersController < Api::BaseController
   end
 
   def reset_password
-    password_hash = params[:password_hash] || params[:password]
-    password_reset_token = params[:password_reset_token] || params[:token]
+    token = params[:token] || params[:password_reset_token]
+    password = params[:password]
     password_confirmation = params[:password_confirmation]
     
     begin
-      if password_reset_token
-        user = PasswordResetService::ValidateEmail.new.validate_token_and_email(password_reset_token, params[:email])
-        PasswordResetService::ValidatePassword.new.update_password_hash(user, password_hash)
+      if token
+        user = PasswordResetService::ValidateEmail.new.validate_token_and_email(token, params[:email])
+        PasswordResetService::ValidatePassword.new.update_password_hash(user, password)
       else
-        user = User.find_by_reset_password_token(password_reset_token)
+        user = User.find_by_reset_password_token(token)
         unless user
           render json: { status: 400, message: "Invalid token." }, status: :bad_request
           return
         end
-        if password_hash.length < 8
+        if password.length < 8
           render json: { status: 400, message: "Password must be at least 8 characters." }, status: :bad_request
           return
         end
-        if password_hash != password_confirmation
+        if password != password_confirmation
           render json: { status: 400, message: "Password confirmation does not match." }, status: :bad_request
           return
         end
-        user.reset_password(password_hash, password_confirmation)
+        user.reset_password(password, password_confirmation)
       end
       render json: { status: 200, message: "Your password has been reset successfully." }, status: :ok
     rescue => e
@@ -93,6 +94,17 @@ class Api::UsersController < Api::BaseController
   end
   
   private
+
+  def sign_in
+    email = params[:email]
+    password_hash = params[:password_hash]
+    begin
+      token = Auths::LoginService.new(email, password_hash).perform
+      render json: { status: 200, message: "Login successful", token: token }, status: :ok
+    rescue StandardError => e
+      render json: { status: 401, message: e.message }, status: :unauthorized
+    end
+  end
 
   def execute_register(user_params)
     if user_params[:name]
