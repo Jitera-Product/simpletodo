@@ -1,16 +1,14 @@
 class Api::TodosController < Api::BaseController
   before_action :doorkeeper_authorize!
-  before_action :set_todo, only: [:destroy, :attach_files, :cancel_deletion]
+  before_action :set_todo, only: [:destroy, :attach_files, :cancel_deletion, :recover]
 
   def index
     todos = TodoService::Index.new(params.permit!, current_resource_owner).execute
-
     render json: todos, status: :ok
   end
 
   def trash
     todos = TodoService::Trash.new(params.permit!, current_resource_owner).execute
-
     render json: todos, status: :ok
   end
 
@@ -75,7 +73,6 @@ class Api::TodosController < Api::BaseController
     elsif !validate_cancellation(@todo.id)
       render json: { error: "Cancellation is not valid or the time frame has expired." }, status: :unprocessable_entity
     else
-      # Assuming the Trash model has a method to restore the item
       if Trash.restore(@todo.id)
         render json: { status: 200, message: "To-do item deletion has been successfully canceled." }, status: :ok
       else
@@ -90,6 +87,19 @@ class Api::TodosController < Api::BaseController
       render json: { status: 200, message: "The todo item details are valid." }, status: :ok
     else
       render json: { errors: validation_service.errors }, status: validation_service.error_status
+    end
+  end
+
+  def recover
+    if @todo.nil?
+      render json: { error: "Todo item not found in trash." }, status: :bad_request
+    else
+      recovery_message = TodoItemService::Recover.execute(@todo.id)
+      if recovery_message == "To-do item has been successfully recovered from the trash."
+        render json: { message: recovery_message }, status: :ok
+      else
+        render json: { error: recovery_message }, status: :unprocessable_entity
+      end
     end
   end
 
@@ -112,7 +122,6 @@ class Api::TodosController < Api::BaseController
   end
 
   def todo_params
-    # Merging the new and existing todo_params
     params.permit(
       :title,
       :description,
@@ -126,7 +135,6 @@ class Api::TodosController < Api::BaseController
   end
 
   def validate_cancellation(id)
-    # Assuming Trash model has a method to check if cancellation is valid
     Trash.validate_cancellation(id)
   end
 end
