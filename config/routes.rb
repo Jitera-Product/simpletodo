@@ -9,16 +9,17 @@ Rails.application.routes.draw do
   namespace :api do
     resources :users, only: [] do
       collection do
-        post 'register', to: 'users#register' # New code addition
-        post 'resend_confirmation', to: 'users#resend_confirmation' # Merged new and existing code
+        post :register
+        post :resend_confirmation
         get :confirm
-        get 'confirm/:confirmation_token', to: 'users#confirm', as: :confirm_with_token # Renamed route to avoid conflict
+        get 'confirm/:confirmation_token', to: 'users#confirm', as: :confirm_email
+        post 'confirm-password-reset', to: 'users#confirm_password_reset'
         get :validate_session
         post :sign_in
-        post 'login', to: 'users#login', as: :login # Existing code addition
         post :forgot_password
-        post 'request-password-reset', to: 'users#request_password_reset' # New code addition
         put :reset_password
+        post 'login', to: 'users#login', as: :login # Preserved existing code
+        post 'request-password-reset', to: 'users#request_password_reset' # Preserved new code addition
       end
     end
 
