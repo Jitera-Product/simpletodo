@@ -30,6 +30,16 @@ class User < ApplicationRecord
     save
   end
 
+  def generate_password_reset_token
+    token = SecureRandom.hex(10)
+    password_reset_token = self.password_reset_tokens.create(token: token, created_at: Time.current)
+    if password_reset_token.persisted?
+      token
+    else
+      nil
+    end
+  end
+
   # end instance methods
 
   class << self

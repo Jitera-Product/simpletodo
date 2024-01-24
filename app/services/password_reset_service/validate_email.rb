@@ -1,14 +1,17 @@
-
 # rubocop:disable Style/ClassAndModuleChildren
 class PasswordResetService::ValidateEmail
   attr_accessor :email
+
   def initialize(email)
     @email = email
   end
+
   def execute
     validate_email_format
   end
+
   private
+
   def validate_email_format
     regex = /\A[\w+\-.]+@[a-z\d\-]+(\.[a-z\d\-]+)*\.[a-z]+\z/i
     if email.match(regex)

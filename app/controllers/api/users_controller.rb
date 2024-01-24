@@ -93,6 +93,29 @@ class Api::UsersController < Api::BaseController
     end
   end
   
+  def forgot_password
+    email = params[:email]
+    email_validator = PasswordResetService::ValidateEmail.new(email)
+    unless email_validator.execute
+      render json: { status: 400, message: "Invalid email format." }, status: :bad_request
+      return
+    end
+
+    user = User.find_by_email(email)
+    unless user
+      render json: { status: 404, message: "User not found." }, status: :not_found
+      return
+    end
+
+    token = user.generate_password_reset_token
+    if token
+      UserMailer.reset_password_instructions(user, token).deliver_now
+      render json: { status: 200, message: "Password reset instructions have been sent to your email." }, status: :ok
+    else
+      render json: { status: 500, message: "An unexpected error occurred on the server." }, status: :internal_server_error
+    end
+  end
+  
   private
 
   def execute_register(user_params)
