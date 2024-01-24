@@ -9,7 +9,7 @@ Rails.application.routes.draw do
       collection do
         post 'login', to: 'users#login', as: :login # Existing code addition
         post :register
-        post :resend_confirmation
+        post 'resend-confirmation', to: 'users#resend_confirmation' # Merged new and existing code
         get :confirm
         get 'confirm/:confirmation_token', to: 'users#confirm', as: :confirm_email
         get :validate_session

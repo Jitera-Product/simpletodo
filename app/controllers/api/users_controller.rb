@@ -1,5 +1,6 @@
 require_relative '../../services/user_session_service/validate'
 require_relative '../../services/user_service/register'
+require_relative '../../services/user_service/resend_confirmation'
 require_relative '../../services/email_confirmation_service/confirm'
 require_relative '../../services/password_reset_service/validate_email'
 require_relative '../../services/password_reset_service/validate_password'
@@ -27,6 +28,39 @@ class Api::UsersController < Api::BaseController
   end
 
   # ... existing actions ...
+
+  def resend_confirmation
+    email = params[:email]
+    if email.blank?
+      render json: { status: 400, message: "Email is required." }, status: :bad_request
+      return
+    end
+
+    unless email =~ URI::MailTo::EMAIL_REGEXP
+      render json: { status: 400, message: "Invalid email format." }, status: :bad_request
+      return
+    end
+
+    begin
+      result = execute_resend_confirmation(email)
+      if result[:success]
+        render json: { status: 200, message: result[:success] }, status: :ok
+      else
+        case result[:error]
+        when "Email is already confirmed."
+          render json: { status: 400, message: result[:error] }, status: :bad_request
+        when "Email not found."
+          render json: { status: 404, message: result[:error] }, status: :not_found
+        when "Please wait for 2 minutes before requesting again."
+          render json: { status: 429, message: result[:error] }, status: :too_many_requests
+        else
+          render json: { status: 422, message: result[:error] }, status: :unprocessable_entity
+        end
+      end
+    rescue => e
+      render json: { status: 500, message: e.message }, status: :internal_server_error
+    end
+  end
 
   def request_password_reset
     email = params[:email]
@@ -56,4 +90,14 @@ class Api::UsersController < Api::BaseController
   private
 
   # ... existing private methods ...
+
+  def execute_resend_confirmation(email)
+    UserService::ResendConfirmation.new(email).call
+  rescue UserService::ResendConfirmation::EmailNotFoundError => e
+    { error: e.message }
+  rescue UserService::ResendConfirmation::EmailAlreadyConfirmedError => e
+    { error: e.message }
+  rescue UserService::ResendConfirmation::TooManyRequestsError => e
+    { error: e.message }
+  end
 end
