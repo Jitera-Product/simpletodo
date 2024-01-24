@@ -1,5 +1,10 @@
+
+require_relative '../../services/user_session_service/validate'
+require_relative '../../services/email_confirmation_service/confirm'
+
 class Api::UsersController < Api::BaseController
   before_action :doorkeeper_authorize!, only: %i[create update destroy]
+
   def register
     user_params = params.require(:user).permit(:email, :password)
     begin
@@ -11,29 +16,34 @@ class Api::UsersController < Api::BaseController
       render json: { status: 500, message: e.message }, status: :internal_server_error
     end
   end
+
   def confirm
-    token = params[:token]
-    result = execute(token)
+    confirmation_token = params[:confirmation_token]
+    result = execute(confirmation_token)
     if result[:error]
       render json: { status: 422, message: "Invalid or expired token." }, status: :unprocessable_entity
     else
       render json: { status: 200, message: "Email confirmation successful. You can now login." }, status: :ok
     end
   end
+
   def validate_session
     session_token = params[:session_token]
+
     if session_token.blank?
       render json: { error: 'The session token is required.' }, status: :bad_request
+      return
+    end
+
+    result = UserSessionService::Validate.new(session_token).execute
+
+    if result[:status]
+      render json: { message: 'Session token is valid.' }, status: :ok
     else
-      result = execute(session_token)
-      if result[:status]
-        @user = User.find_by(session_token: session_token)
-        render 'api/users/validate_session', status: :ok
-      else
-        render json: { error: result[:error] || 'Invalid session token.' }, status: :unauthorized
-      end
+      render json: { error: result[:error] }, status: :unauthorized
     end
   end
+
   def resend_confirmation
     begin
       result = execute_resend_confirmation(params[:email])
@@ -46,6 +56,7 @@ class Api::UsersController < Api::BaseController
       render json: { status: 500, message: e.message }, status: :internal_server_error
     end
   end
+
   def reset_password
     token = params[:token]
     password = params[:password]
@@ -73,17 +84,20 @@ class Api::UsersController < Api::BaseController
       render json: { status: 500, message: "An unexpected error occurred on the server." }, status: :internal_server_error
     end
   end
+
   private
+
   def execute_register(user_params)
     user = User.new(user_params)
     user.save!
     # Assuming the business logic for generating a confirmation token and sending a confirmation email is handled in the User model after save
   end
-  def execute(token)
-    # This is a placeholder for the actual business logic function
-    # In the real application, this function should be replaced with the actual business logic function
-    { status: true }
+
+  def execute(confirmation_token)
+    confirm_service = EmailConfirmationService::Confirm.new(confirmation_token)
+    confirm_service.execute
   end
+
   def execute_resend_confirmation(email)
     user = User.find_by_email(email)
     return { error: "Email not found." } unless user
