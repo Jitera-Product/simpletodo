@@ -70,6 +70,11 @@ en:
         instruction_2: If you didn't request this, please ignore this email.
         instruction_3: Your password won't change until you access the link above and create a new one.
         subject: Reset password instructions
+      reset_password_instructions:
+        subject: "Reset your password"
+        greeting: "Hello %{user_name},"
+        instructions: "Please click the link below to reset your password:"
+        action: "Reset My Password"
       unlock_instructions:
         action: Unlock account
         greeting: Hi %{recipient},
