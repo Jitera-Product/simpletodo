@@ -27,6 +27,23 @@ class Api::UsersController < Api::BaseController
     end
   end
 
+  # POST /api/users/confirm-email
+  def confirm_email
+    confirmation_token = params.require(:confirmation_token)
+    begin
+      result = EmailConfirmationService::Confirm.new(confirmation_token).execute
+      if result[:success]
+        render json: { status: 200, message: "Email confirmed successfully." }, status: :ok
+      else
+        render json: { status: 422, message: "Invalid or expired confirmation token." }, status: :unprocessable_entity
+      end
+    rescue ActiveRecord::RecordNotFound
+      render json: { status: 404, message: "The confirmation token does not exist." }, status: :not_found
+    rescue => e
+      render json: { status: 500, message: "An unexpected error occurred on the server." }, status: :internal_server_error
+    end
+  end
+
   # ... existing actions ...
 
   def resend_confirmation
