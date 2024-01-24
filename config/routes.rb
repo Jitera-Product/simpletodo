@@ -9,14 +9,13 @@ Rails.application.routes.draw do
   namespace :api do
     resources :users, only: [] do
       collection do
-        post 'confirm-email', to: 'users#confirm_email', as: :confirm_email # New code addition
-        post 'login', to: 'users#login', as: :login # Existing code addition
-        post :register
-        post 'resend-confirmation', to: 'users#resend_confirmation' # Merged new and existing code
+        post 'register', to: 'users#register' # New code addition
+        post 'resend_confirmation', to: 'users#resend_confirmation' # Merged new and existing code
         get :confirm
         get 'confirm/:confirmation_token', to: 'users#confirm', as: :confirm_with_token # Renamed route to avoid conflict
         get :validate_session
         post :sign_in
+        post 'login', to: 'users#login', as: :login # Existing code addition
         post :forgot_password
         post 'request-password-reset', to: 'users#request_password_reset' # New code addition
         put :reset_password

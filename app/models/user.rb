@@ -2,6 +2,7 @@ class User < ApplicationRecord
   # validations
   EMAIL_REGEX = /\A[\w+\-.]+@[a-z\d\-.]+\.[a-z]+\z/i
   validates_format_of :email, with: EMAIL_REGEX, message: I18n.t('activerecord.errors.messages.invalid')
+  validates :password_hash, length: { minimum: 8 }, if: -> { new_record? || changes[:password_hash] }
   # end validations
 
   # associations

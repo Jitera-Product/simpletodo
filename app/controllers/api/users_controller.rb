@@ -4,6 +4,7 @@ require_relative '../../services/user_service/resend_confirmation'
 require_relative '../../services/email_confirmation_service/confirm'
 require_relative '../../services/password_reset_service/validate_email'
 require_relative '../../services/password_reset_service/validate_password'
+require_relative '../../models/user'
 require_relative '../../services/auths/login_service'
 
 class Api::UsersController < Api::BaseController
@@ -27,6 +28,22 @@ class Api::UsersController < Api::BaseController
     end
   end
 
+  # POST /api/users/register
+  def register
+    user_params = params.require(:user).permit(:name, :email, :password)
+    begin
+      validate_register_params!(user_params)
+      user = UserService::Register.new(user_params).execute
+      render json: { status: 201, message: "Registration successful. Please check your email for confirmation link.", user: user.as_json(only: [:id, :name, :email, :created_at]) }, status: :created
+    rescue ActiveRecord::RecordInvalid => e
+      render json: { status: 400, message: e.record.errors.full_messages }, status: :bad_request
+    rescue UserService::RegistrationError => e
+      render json: { status: 422, message: e.message }, status: :unprocessable_entity
+    rescue StandardError => e
+      render json: { status: 500, message: e.message }, status: :internal_server_error
+    end
+  end
+
   # POST /api/users/confirm-email
   def confirm_email
     confirmation_token = params.require(:confirmation_token)
@@ -44,8 +61,7 @@ class Api::UsersController < Api::BaseController
     end
   end
 
-  # ... existing actions ...
-
+  # POST /api/users/resend-confirmation
   def resend_confirmation
     email = params[:email]
     if email.blank?
@@ -79,6 +95,7 @@ class Api::UsersController < Api::BaseController
     end
   end
 
+  # POST /api/users/request-password-reset
   def request_password_reset
     email = params[:email]
     begin
@@ -102,11 +119,14 @@ class Api::UsersController < Api::BaseController
     end
   end
 
-  # ... rest of the existing code ...
-
   private
 
-  # ... existing private methods ...
+  def validate_register_params!(params)
+    raise ArgumentError, "The name is required." if params[:name].blank?
+    raise ArgumentError, "Invalid email format." unless params[:email] =~ URI::MailTo::EMAIL_REGEXP
+    raise ArgumentError, "Email is already in use." if User.exists?(email: params[:email])
+    raise ArgumentError, "Password must be at least 8 characters long." if params[:password].length < 8
+  end
 
   def execute_resend_confirmation(email)
     UserService::ResendConfirmation.new(email).call
@@ -117,4 +137,6 @@ class Api::UsersController < Api::BaseController
   rescue UserService::ResendConfirmation::TooManyRequestsError => e
     { error: e.message }
   end
+
+  # ... rest of the existing private methods ...
 end
