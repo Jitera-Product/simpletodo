@@ -95,17 +95,6 @@ class Api::UsersController < Api::BaseController
   
   private
 
-  def sign_in
-    email = params[:email]
-    password_hash = params[:password_hash]
-    begin
-      token = Auths::LoginService.new(email, password_hash).perform
-      render json: { status: 200, message: "Login successful", token: token }, status: :ok
-    rescue StandardError => e
-      render json: { status: 401, message: e.message }, status: :unauthorized
-    end
-  end
-
   def execute_register(user_params)
     if user_params[:name]
       UserService::Register.new(user_params).execute

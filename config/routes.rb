@@ -9,12 +9,12 @@ Rails.application.routes.draw do
   namespace :api do
     resources :users, only: [] do
       collection do
-        post :register
-        post :sign_in
-        get :confirm
-        get 'confirm/:confirmation_token', to: 'users#confirm', as: :confirm_email
-        get :validate_session
+        post :register # Existing code addition
         post :resend_confirmation
+        get :confirm
+        get 'confirm/:confirmation_token', to: 'users#confirm', as: :confirm_email # Existing code addition
+        get :validate_session
+        post :sign_in
         post :forgot_password
         put :reset_password
       end
