@@ -27,7 +27,7 @@ gem 'pg', '~> 1.2'
 gem 'puma', '~> 5.5.2'
 gem 'pundit'
 gem 'rack-cors'
-gem 'rails', '~> 7.0.1'
+gem 'rails', '~> 7.0.8'
 gem 'rails-i18n'
 gem 'redis', '4.5.1'
 # jitera-hook-for-rollbar
