@@ -220,6 +220,8 @@ GEM
     nokogiri (1.12.5)
       mini_portile2 (~> 2.6.1)
       racc (~> 1.4)
+    nokogiri (1.12.5-x86_64-linux)
+      racc (~> 1.4)
     orm_adapter (0.5.0)
     parallel (1.23.0)
     parser (3.2.2.4)
@@ -243,7 +245,7 @@ GEM
     pundit (2.3.1)
       activesupport (>= 3.0.0)
     racc (1.7.3)
-    rack (2.2.8)
+    rack (2.2.8.1)
     rack-cors (2.0.1)
       rack (>= 2.0.0)
     rack-test (2.1.0)
@@ -440,6 +442,7 @@ GEM
 
 PLATFORMS
   aarch64-linux
+  x86_64-linux
 
 DEPENDENCIES
   active_storage_validations
